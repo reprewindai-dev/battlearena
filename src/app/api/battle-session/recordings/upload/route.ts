@@ -1,0 +1,119 @@
+import { NextResponse } from "next/server";
+
+import { isMockAuthEnabled } from "@/lib/auth/config";
+import { getSessionUser } from "@/lib/auth/session";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type UploadInitResponse =
+  | {
+      ok: true;
+      mode: "mock" | "supabase";
+      recordingId: string;
+      bucket: string;
+      path: string;
+      token: string;
+      signedUrl: string;
+    }
+  | { error: string; details?: string };
+
+export async function POST(req: Request) {
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json().catch(() => null)) as unknown;
+  const battleId =
+    body && typeof body === "object" && "battleId" in body
+      ? ((body as Record<string, unknown>).battleId as unknown)
+      : null;
+  const mimeType =
+    body && typeof body === "object" && "mimeType" in body
+      ? ((body as Record<string, unknown>).mimeType as unknown)
+      : null;
+  const durationSeconds =
+    body && typeof body === "object" && "durationSeconds" in body
+      ? ((body as Record<string, unknown>).durationSeconds as unknown)
+      : null;
+  const bytes =
+    body && typeof body === "object" && "bytes" in body
+      ? ((body as Record<string, unknown>).bytes as unknown)
+      : null;
+
+  if (typeof battleId !== "string" || battleId.length === 0) {
+    return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
+  }
+
+  if (isMockAuthEnabled) {
+    const mock = {
+      ok: true,
+      mode: "mock",
+      recordingId: `mock_${crypto.randomUUID()}`,
+      bucket: "battle-recordings",
+      path: `${battleId}/mock/${crypto.randomUUID()}.webm`,
+      token: "mock-token",
+      signedUrl: "",
+    } satisfies UploadInitResponse;
+
+    return NextResponse.json(mock);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const bucket = "battle-recordings";
+  const fileExt = typeof mimeType === "string" && mimeType.includes("wav") ? "wav" : "webm";
+  const path = `${battleId}/${authData.user.id}/${crypto.randomUUID()}.${fileExt}`;
+
+  const { data: signed, error: signError } = await supabase.storage
+    .from(bucket)
+    .createSignedUploadUrl(path);
+
+  if (signError || !signed) {
+    return NextResponse.json(
+      { error: "signed_upload_failed", details: signError?.message },
+      { status: 400 },
+    );
+  }
+
+  const insert: Record<string, unknown> = {
+    battle_id: battleId,
+    created_by: authData.user.id,
+    storage_bucket: bucket,
+    storage_path: path,
+  };
+
+  if (typeof mimeType === "string") insert.mime_type = mimeType;
+  if (typeof durationSeconds === "number" && Number.isFinite(durationSeconds)) {
+    insert.duration_seconds = Math.max(0, Math.floor(durationSeconds));
+  }
+  if (typeof bytes === "number" && Number.isFinite(bytes)) {
+    insert.bytes = Math.max(0, Math.floor(bytes));
+  }
+
+  const { data: rows, error: insertError } = await supabase
+    .from("battle_recordings")
+    .insert(insert)
+    .select("id")
+    .limit(1);
+
+  if (insertError || !rows?.[0]?.id) {
+    return NextResponse.json(
+      { error: "recording_row_create_failed", details: insertError?.message },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    mode: "supabase",
+    recordingId: rows[0].id as string,
+    bucket,
+    path,
+    token: signed.token,
+    signedUrl: signed.signedUrl,
+  } satisfies UploadInitResponse);
+}
