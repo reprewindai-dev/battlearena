@@ -44,6 +44,7 @@ type BattleSessionMetadata = {
   current_round?: number | null;
   voting_opened_at?: string | null;
   voting_closes_at?: string | null;
+  result?: unknown | null;
   participants: BattleParticipant[];
 };
 
@@ -102,6 +103,8 @@ export function BattleRoomCockpit() {
   const [isJoining, setIsJoining] = React.useState(false);
   const [statusError, setStatusError] = React.useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
+  const [finalizeError, setFinalizeError] = React.useState<string | null>(null);
+  const [isFinalizing, setIsFinalizing] = React.useState(false);
   const [nowMs, setNowMs] = React.useState(() => Date.now());
 
   React.useEffect(() => {
@@ -282,6 +285,41 @@ export function BattleRoomCockpit() {
       setStatusError("Unable to update battle status.");
     } finally {
       setIsUpdatingStatus(false);
+    }
+  }
+
+  async function finalizeBattle() {
+    if (!sessionId) return;
+    setIsFinalizing(true);
+    setFinalizeError(null);
+    try {
+      const res = await fetch("/api/battle-session/finalize", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ battleId: sessionId }),
+      });
+
+      if (!res.ok) {
+        setFinalizeError("Unable to finalize battle.");
+        return;
+      }
+
+      const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
+      const metaRes = await fetch(url, { method: "GET" });
+      const metaBody = (await metaRes.json()) as
+        | { ok: true; mode: "mock" | "supabase"; session: BattleSessionMetadata }
+        | { error: string; details?: string };
+
+      if (!metaRes.ok || !("ok" in metaBody)) {
+        setFinalizeError("Finalized, but unable to refresh battle metadata.");
+        return;
+      }
+
+      setSessionMeta(metaBody.session);
+    } catch {
+      setFinalizeError("Unable to finalize battle.");
+    } finally {
+      setIsFinalizing(false);
     }
   }
 
@@ -1056,10 +1094,10 @@ export function BattleRoomCockpit() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => updateBattleStatus("complete")}
-                      disabled={isUpdatingStatus}
+                      onClick={() => void finalizeBattle()}
+                      disabled={isFinalizing}
                     >
-                      {isUpdatingStatus ? "Updating…" : "End"}
+                      {isFinalizing ? "Finalizing…" : "Finalize"}
                     </Button>
                   )}
                 </>
@@ -1096,6 +1134,17 @@ export function BattleRoomCockpit() {
       {joinError ? <div className="text-xs text-amber-200/90">{joinError}</div> : null}
 
       {statusError ? <div className="text-xs text-amber-200/90">{statusError}</div> : null}
+
+      {finalizeError ? <div className="text-xs text-amber-200/90">{finalizeError}</div> : null}
+
+      {sessionMeta?.status === "complete" && sessionMeta.result ? (
+        <Card className="border-border/60 bg-card/40 p-4 backdrop-blur">
+          <div className="text-sm font-medium">Result</div>
+          <pre className="mt-2 overflow-auto rounded-md border border-border/60 bg-background/30 p-3 text-xs">
+            {JSON.stringify(sessionMeta.result, null, 2)}
+          </pre>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">

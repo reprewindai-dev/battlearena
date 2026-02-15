@@ -12,6 +12,12 @@ type BattleParticipant = {
   display_name?: string | null;
 };
 
+type ParticipantRow = {
+  user_id: string;
+  slot: number;
+  score: number | null;
+};
+
 type BattleSession = {
   id: string;
   status: string;
@@ -23,6 +29,7 @@ type BattleSession = {
   current_round?: number | null;
   voting_opened_at?: string | null;
   voting_closes_at?: string | null;
+  result?: unknown | null;
   created_at: string | null;
   can_manage?: boolean;
   viewer_role?: string | null;
@@ -57,6 +64,7 @@ export async function GET(req: Request) {
       current_round: 1,
       voting_opened_at: new Date().toISOString(),
       voting_closes_at: new Date(Date.now() + 60_000).toISOString(),
+      result: null,
       created_at: null,
       can_manage: true,
       viewer_role: "admin",
@@ -79,7 +87,7 @@ export async function GET(req: Request) {
   const { data: battle, error: battleError } = await supabase
     .from("battles")
     .select(
-      "id,created_by,status,mode,created_at,started_at,ended_at,current_round,voting_opened_at,voting_closes_at",
+      "id,created_by,status,mode,created_at,started_at,ended_at,current_round,voting_opened_at,voting_closes_at,result",
     )
     .eq("id", battleId)
     .maybeSingle();
@@ -108,7 +116,11 @@ export async function GET(req: Request) {
   }
 
   const userIds = Array.from(
-    new Set((participants ?? []).map((p) => p.user_id).filter((id): id is string => Boolean(id))),
+    new Set(
+      (participants ?? [])
+        .map((p: ParticipantRow) => p.user_id)
+        .filter((id: string | null): id is string => Boolean(id)),
+    ),
   );
 
   const profilesById = new Map<string, { handle: string | null; display_name: string | null }>();
@@ -135,7 +147,7 @@ export async function GET(req: Request) {
     }
   }
 
-  const hydratedParticipants: BattleParticipant[] = (participants ?? []).map((p) => {
+  const hydratedParticipants: BattleParticipant[] = (participants ?? []).map((p: ParticipantRow) => {
     const prof = profilesById.get(p.user_id);
     return {
       user_id: p.user_id,
@@ -157,6 +169,7 @@ export async function GET(req: Request) {
     current_round: (battle as { current_round?: number | null }).current_round ?? null,
     voting_opened_at: (battle as { voting_opened_at?: string | null }).voting_opened_at ?? null,
     voting_closes_at: (battle as { voting_closes_at?: string | null }).voting_closes_at ?? null,
+    result: (battle as { result?: unknown | null }).result ?? null,
     created_at: battle.created_at,
     can_manage: battle.created_by === user.id || isModOrAdmin(role),
     viewer_role: role,

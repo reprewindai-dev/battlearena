@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FreestyleQueueCard } from "@/components/battle/FreestyleQueueCard";
 import { isMockAuthEnabled, isSupabaseConfigured } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -53,15 +54,7 @@ export default function BattleLobbyPage() {
       <RecentBattles getRecentBattles={getRecentBattles} />
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-border/60 bg-card/40 p-5 backdrop-blur">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">Freestyle queue</div>
-            <Badge variant="secondary">stub</Badge>
-          </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            In v1 this will create a battle record and add you as a participant.
-          </div>
-        </Card>
+        <FreestyleQueueCard />
 
         <Card className="border-border/60 bg-card/40 p-5 backdrop-blur">
           <div className="flex items-center justify-between">
