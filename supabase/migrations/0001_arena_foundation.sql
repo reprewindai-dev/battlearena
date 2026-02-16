@@ -18,6 +18,41 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+do $$
+begin
+  -- Some Supabase templates create public.profiles with primary key column named "id".
+  -- This migration expects "user_id", so add and backfill it to keep downstream policies valid.
+  if to_regclass('public.profiles') is not null then
+    alter table public.profiles add column if not exists user_id uuid;
+
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'profiles'
+        and column_name = 'id'
+    ) then
+      update public.profiles
+      set user_id = id
+      where user_id is null;
+    end if;
+
+    create unique index if not exists profiles_user_id_unique_idx on public.profiles (user_id);
+
+    if not exists (
+      select 1
+      from pg_constraint
+      where conname = 'profiles_user_id_fkey'
+        and conrelid = 'public.profiles'::regclass
+    ) then
+      alter table public.profiles
+      add constraint profiles_user_id_fkey
+      foreign key (user_id) references auth.users(id) on delete cascade;
+    end if;
+  end if;
+end
+$$;
+
 create table if not exists public.roles (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -55,6 +90,55 @@ create table if not exists public.battles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+do $$
+begin
+  -- If public.battles already exists (e.g. created by a template) it may not include created_by.
+  -- Policies in this migration rely on it, so add + best-effort backfill from common alternative names.
+  if to_regclass('public.battles') is not null then
+    alter table public.battles add column if not exists created_by uuid;
+
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'battles' and column_name = 'user_id'
+    ) then
+      execute 'update public.battles set created_by = user_id where created_by is null';
+    end if;
+
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'battles' and column_name = 'owner_id'
+    ) then
+      execute 'update public.battles set created_by = owner_id where created_by is null';
+    end if;
+
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'battles' and column_name = 'creator_id'
+    ) then
+      execute 'update public.battles set created_by = creator_id where created_by is null';
+    end if;
+
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'battles' and column_name = 'created_by_id'
+    ) then
+      execute 'update public.battles set created_by = created_by_id where created_by is null';
+    end if;
+
+    if not exists (
+      select 1
+      from pg_constraint
+      where conname = 'battles_created_by_fkey'
+        and conrelid = 'public.battles'::regclass
+    ) then
+      alter table public.battles
+      add constraint battles_created_by_fkey
+      foreign key (created_by) references auth.users(id);
+    end if;
+  end if;
+end
+$$;
 
 alter table public.battles
 add column if not exists current_round int;
@@ -327,83 +411,92 @@ using (
 );
 
 -- Storage objects: protect battle recordings bucket
-alter table storage.objects enable row level security;
+do $$
+begin
+  begin
+    execute 'alter table storage.objects enable row level security';
 
-drop policy if exists "storage_battle_recordings_select" on storage.objects;
-create policy "storage_battle_recordings_select" on storage.objects
-for select
-to authenticated
-using (
-  bucket_id = 'battle-recordings'
-  and (
-    public.has_role('admin')
-    or public.has_role('mod')
-    or exists (
-      select 1
-      from public.battles b
-      where b.id::text = split_part(storage.objects.name, '/', 1)
-        and (
-          b.created_by = auth.uid()
-          or exists (
-            select 1 from public.battle_participants bp
-            where bp.battle_id = b.id
-              and bp.user_id = auth.uid()
-          )
+    execute 'drop policy if exists "storage_battle_recordings_select" on storage.objects';
+    execute 'create policy "storage_battle_recordings_select" on storage.objects
+    for select
+    to authenticated
+    using (
+      bucket_id = ''battle-recordings''
+      and (
+        public.has_role(''admin'')
+        or public.has_role(''mod'')
+        or exists (
+          select 1
+          from public.battles b
+          where b.id::text = split_part(storage.objects.name, ''/'', 1)
+            and (
+              b.created_by = auth.uid()
+              or exists (
+                select 1 from public.battle_participants bp
+                where bp.battle_id = b.id
+                  and bp.user_id = auth.uid()
+              )
+            )
         )
-    )
-  )
-);
+      )
+    )';
 
-drop policy if exists "storage_battle_recordings_insert" on storage.objects;
-create policy "storage_battle_recordings_insert" on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id = 'battle-recordings'
-  and (
-    public.has_role('admin')
-    or public.has_role('mod')
-    or exists (
-      select 1
-      from public.battles b
-      where b.id::text = split_part(storage.objects.name, '/', 1)
-        and (
-          b.created_by = auth.uid()
-          or exists (
-            select 1 from public.battle_participants bp
-            where bp.battle_id = b.id
-              and bp.user_id = auth.uid()
-          )
+    execute 'drop policy if exists "storage_battle_recordings_insert" on storage.objects';
+    execute 'create policy "storage_battle_recordings_insert" on storage.objects
+    for insert
+    to authenticated
+    with check (
+      bucket_id = ''battle-recordings''
+      and (
+        public.has_role(''admin'')
+        or public.has_role(''mod'')
+        or exists (
+          select 1
+          from public.battles b
+          where b.id::text = split_part(storage.objects.name, ''/'', 1)
+            and (
+              b.created_by = auth.uid()
+              or exists (
+                select 1 from public.battle_participants bp
+                where bp.battle_id = b.id
+                  and bp.user_id = auth.uid()
+              )
+            )
         )
-    )
-  )
-);
+      )
+    )';
 
-drop policy if exists "storage_battle_recordings_delete" on storage.objects;
-create policy "storage_battle_recordings_delete" on storage.objects
-for delete
-to authenticated
-using (
-  bucket_id = 'battle-recordings'
-  and (
-    public.has_role('admin')
-    or public.has_role('mod')
-    or exists (
-      select 1
-      from public.battles b
-      where b.id::text = split_part(storage.objects.name, '/', 1)
-        and (
-          b.created_by = auth.uid()
-          or exists (
-            select 1
-            from public.battle_participants bp
-            where bp.battle_id = b.id
-              and bp.user_id = auth.uid()
-          )
+    execute 'drop policy if exists "storage_battle_recordings_delete" on storage.objects';
+    execute 'create policy "storage_battle_recordings_delete" on storage.objects
+    for delete
+    to authenticated
+    using (
+      bucket_id = ''battle-recordings''
+      and (
+        public.has_role(''admin'')
+        or public.has_role(''mod'')
+        or exists (
+          select 1
+          from public.battles b
+          where b.id::text = split_part(storage.objects.name, ''/'', 1)
+            and (
+              b.created_by = auth.uid()
+              or exists (
+                select 1
+                from public.battle_participants bp
+                where bp.battle_id = b.id
+                  and bp.user_id = auth.uid()
+              )
+            )
         )
-    )
-  )
-);
+      )
+    )';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+end
+$$;
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles

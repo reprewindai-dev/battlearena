@@ -2,6 +2,42 @@
 
 begin;
 
+-- Ensure role helpers exist when running this migration standalone.
+create or replace function public.jwt_role()
+returns text
+language sql
+stable
+as $$
+  select coalesce(
+    (auth.jwt() -> 'app_metadata' ->> 'role'),
+    (auth.jwt() -> 'user_metadata' ->> 'role')
+  );
+$$;
+
+create or replace function public.has_role(role_name text)
+returns boolean
+language plpgsql
+stable
+as $$
+begin
+  if coalesce(public.jwt_role(), '') = role_name then
+    return true;
+  end if;
+
+  if to_regclass('public.role_assignments') is null or to_regclass('public.roles') is null then
+    return false;
+  end if;
+
+  return exists (
+    select 1
+    from public.role_assignments ra
+    join public.roles r on r.id = ra.role_id
+    where ra.user_id = auth.uid()
+      and r.name = role_name
+  );
+end;
+$$;
+
 do $$
 begin
   if not exists (select 1 from pg_type where typname = 'matchmaking_status' and typnamespace = 'public'::regnamespace) then
@@ -30,7 +66,7 @@ drop policy if exists "matchmaking_queue_select_own" on public.matchmaking_queue
 create policy "matchmaking_queue_select_own" on public.matchmaking_queue
 for select
 to authenticated
-using (user_id = auth.uid() or public.has_role('admin') or public.has_role('mod'));
+using (user_id = auth.uid() or public.has_role('admin'::text) or public.has_role('mod'::text));
 
 drop policy if exists "matchmaking_queue_insert_own" on public.matchmaking_queue;
 create policy "matchmaking_queue_insert_own" on public.matchmaking_queue
@@ -42,8 +78,8 @@ drop policy if exists "matchmaking_queue_update_own" on public.matchmaking_queue
 create policy "matchmaking_queue_update_own" on public.matchmaking_queue
 for update
 to authenticated
-using (user_id = auth.uid() or public.has_role('admin') or public.has_role('mod'))
-with check (user_id = auth.uid() or public.has_role('admin') or public.has_role('mod'));
+using (user_id = auth.uid() or public.has_role('admin'::text) or public.has_role('mod'::text))
+with check (user_id = auth.uid() or public.has_role('admin'::text) or public.has_role('mod'::text));
 
 -- RPC: enqueue for matchmaking and attempt to match immediately.
 create or replace function public.matchmake_enqueue(
