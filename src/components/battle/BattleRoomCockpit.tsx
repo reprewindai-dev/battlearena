@@ -48,6 +48,21 @@ type BattleSessionMetadata = {
   participants: BattleParticipant[];
 };
 
+type FinalizeApiOk = {
+  ok: true;
+  mode: "mock" | "supabase";
+  battleId: string;
+  result: {
+    battle_id: string;
+    finalized_at: string;
+    counts: Record<string, number>;
+    winner_slot: number | null;
+    reason?: string;
+  };
+  elo?: unknown;
+  ratings_error?: string;
+};
+
 function formatMMSS(totalSeconds: number) {
   const s = Math.max(0, Math.floor(totalSeconds));
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
@@ -105,6 +120,7 @@ export function BattleRoomCockpit() {
   const [isUpdatingStatus, setIsUpdatingStatus] = React.useState(false);
   const [finalizeError, setFinalizeError] = React.useState<string | null>(null);
   const [isFinalizing, setIsFinalizing] = React.useState(false);
+  const [finalizeInfo, setFinalizeInfo] = React.useState<FinalizeApiOk | null>(null);
   const [nowMs, setNowMs] = React.useState(() => Date.now());
 
   React.useEffect(() => {
@@ -292,6 +308,7 @@ export function BattleRoomCockpit() {
     if (!sessionId) return;
     setIsFinalizing(true);
     setFinalizeError(null);
+    setFinalizeInfo(null);
     try {
       const res = await fetch("/api/battle-session/finalize", {
         method: "POST",
@@ -299,9 +316,19 @@ export function BattleRoomCockpit() {
         body: JSON.stringify({ battleId: sessionId }),
       });
 
+      const body = (await res.json().catch(() => null)) as unknown;
+
       if (!res.ok) {
-        setFinalizeError("Unable to finalize battle.");
+        const details =
+          body && typeof body === "object" && body && "details" in body
+            ? String((body as { details?: unknown }).details)
+            : null;
+        setFinalizeError(details ? `Unable to finalize battle: ${details}` : "Unable to finalize battle.");
         return;
+      }
+
+      if (body && typeof body === "object" && "ok" in body && (body as { ok?: unknown }).ok === true) {
+        setFinalizeInfo(body as FinalizeApiOk);
       }
 
       const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
@@ -322,6 +349,39 @@ export function BattleRoomCockpit() {
       setIsFinalizing(false);
     }
   }
+
+  const derivedResult =
+    (finalizeInfo?.result as unknown) ?? (sessionMeta?.result as unknown) ?? null;
+
+  const counts =
+    derivedResult && typeof derivedResult === "object" && "counts" in derivedResult
+      ? ((derivedResult as { counts?: Record<string, number> }).counts ?? null)
+      : null;
+
+  const winnerSlot =
+    derivedResult && typeof derivedResult === "object" && "winner_slot" in derivedResult
+      ? ((derivedResult as { winner_slot?: number | null }).winner_slot ?? null)
+      : null;
+
+  const votingClosesAt = sessionMeta?.voting_closes_at ?? null;
+  const votingClosesMs = votingClosesAt ? new Date(votingClosesAt).getTime() : null;
+  const votingRemainingSeconds = votingClosesMs
+    ? Math.max(0, Math.floor((votingClosesMs - nowMs) / 1000))
+    : null;
+  const votingClosed =
+    sessionMode === "supabase" && (votingRemainingSeconds === null || votingRemainingSeconds <= 0);
+
+  const battleStatus = sessionMeta?.status ?? "--";
+  const statusBadge =
+    battleStatus === "live"
+      ? { label: `LIVE (${sessionMode ?? "…"})`, className: "bg-emerald-500/15 text-emerald-200" }
+      : battleStatus === "queued" || battleStatus === "draft"
+        ? { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "…"})`, className: "bg-amber-500/15 text-amber-200" }
+        : battleStatus === "complete"
+          ? { label: `COMPLETE (${sessionMode ?? "…"})`, className: "bg-slate-500/20 text-slate-200" }
+          : battleStatus === "canceled"
+            ? { label: `CANCELED (${sessionMode ?? "…"})`, className: "bg-slate-500/20 text-slate-200" }
+            : { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "…"})`, className: "bg-slate-500/20 text-slate-200" };
 
   function leaveBattle() {
     clearStoredSession();
@@ -1038,9 +1098,7 @@ export function BattleRoomCockpit() {
       <Card className="border-border/60 bg-card/40 p-4 backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Badge className="bg-emerald-500/15 text-emerald-200">
-              LIVE ({sessionMode ?? "…"})
-            </Badge>
+            <Badge className={statusBadge.className}>{statusBadge.label}</Badge>
             <div className="text-xs text-muted-foreground">
               Round <span className="text-foreground">{round}</span>
             </div>
@@ -1095,7 +1153,7 @@ export function BattleRoomCockpit() {
                       size="sm"
                       variant="outline"
                       onClick={() => void finalizeBattle()}
-                      disabled={isFinalizing}
+                      disabled={isFinalizing || votingClosed}
                     >
                       {isFinalizing ? "Finalizing…" : "Finalize"}
                     </Button>
@@ -1137,12 +1195,28 @@ export function BattleRoomCockpit() {
 
       {finalizeError ? <div className="text-xs text-amber-200/90">{finalizeError}</div> : null}
 
-      {sessionMeta?.status === "complete" && sessionMeta.result ? (
+      {sessionMeta?.status === "complete" && (sessionMeta.result || finalizeInfo?.result) ? (
         <Card className="border-border/60 bg-card/40 p-4 backdrop-blur">
           <div className="text-sm font-medium">Result</div>
-          <pre className="mt-2 overflow-auto rounded-md border border-border/60 bg-background/30 p-3 text-xs">
-            {JSON.stringify(sessionMeta.result, null, 2)}
-          </pre>
+          <div className="mt-2 grid gap-2 text-xs">
+            <div>
+              Winner:{" "}
+              <span className="font-mono text-foreground">
+                {winnerSlot === 1 ? "A" : winnerSlot === 2 ? "B" : "Tie"}
+              </span>
+            </div>
+            <div>
+              Votes:{" "}
+              <span className="font-mono text-foreground">
+                A={counts?.["1"] ?? 0} / B={counts?.["2"] ?? 0}
+              </span>
+            </div>
+            {finalizeInfo?.ratings_error ? (
+              <div className="text-amber-200/90">Elo update: {finalizeInfo.ratings_error}</div>
+            ) : finalizeInfo?.elo ? (
+              <div className="text-muted-foreground">Elo update: applied</div>
+            ) : null}
+          </div>
         </Card>
       ) : null}
 
@@ -1425,10 +1499,7 @@ export function BattleRoomCockpit() {
             className="border-border/60 bg-card/40 p-5 backdrop-blur"
           >
             {(() => {
-              const closes = sessionMeta?.voting_closes_at;
-              const closesMs = closes ? new Date(closes).getTime() : null;
-              const remainingSeconds = closesMs ? Math.max(0, Math.floor((closesMs - nowMs) / 1000)) : null;
-              const votingClosed = isSupabaseMode && (remainingSeconds === null || remainingSeconds <= 0);
+              const remainingSeconds = votingRemainingSeconds;
 
               return (
                 <>
@@ -1440,15 +1511,14 @@ export function BattleRoomCockpit() {
                       </div>
                       {isSupabaseMode ? (
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {votingClosed
-                            ? "Voting is closed"
-                            : remainingSeconds !== null
-                              ? `Voting closes in ${formatMMSS(remainingSeconds)}`
-                              : "Voting window unknown"}
+                          Voting {votingClosed ? "closed" : "open"}
+                          {remainingSeconds !== null && !votingClosed
+                            ? ` · closes in ${remainingSeconds}s`
+                            : ""}
                         </div>
                       ) : null}
                     </div>
-                    <Badge variant="secondary">slot</Badge>
+                    <Badge variant="secondary">live</Badge>
                   </div>
 
                   <Separator className="my-4" />
@@ -1481,6 +1551,10 @@ export function BattleRoomCockpit() {
                     </div>
 
                     {voteError ? <div className="text-xs text-amber-200/90">{voteError}</div> : null}
+
+                    {votingClosed ? (
+                      <div className="text-xs text-muted-foreground">Voting is closed for this round.</div>
+                    ) : null}
 
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs text-muted-foreground">

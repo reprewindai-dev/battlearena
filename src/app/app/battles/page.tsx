@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FreestyleQueueCard } from "@/components/battle/FreestyleQueueCard";
+import { RankedQueueCard } from "@/components/battle/RankedQueueCard";
 import { isMockAuthEnabled, isSupabaseConfigured } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -46,9 +47,14 @@ export default function BattleLobbyPage() {
             Recent sessions + queues (incremental).
           </p>
         </div>
-        <Button asChild>
-          <Link href="/app/battles/room">Enter battle room</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/app/battles/history">History</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/app/battles/room">Enter battle room</Link>
+          </Button>
+        </div>
       </div>
 
       <RecentBattles getRecentBattles={getRecentBattles} />
@@ -56,15 +62,7 @@ export default function BattleLobbyPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <FreestyleQueueCard />
 
-        <Card className="border-border/60 bg-card/40 p-5 backdrop-blur">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">Ranked queue</div>
-            <Badge variant="secondary">stub</Badge>
-          </div>
-          <div className="mt-2 text-sm text-muted-foreground">
-            Ratings (Glicko placeholders) will back matchmaking.
-          </div>
-        </Card>
+        <RankedQueueCard />
       </div>
     </div>
   );

@@ -53,3 +53,16 @@ test("battle room loads in skeleton state", async ({ context, page }) => {
   await expect(page.getByTestId("chat-slot")).toBeVisible();
   await expect(page.getByTestId("vote-slot")).toBeVisible();
 });
+
+test("ranked queue joins and redirects to battle room", async ({ context, page }) => {
+  await setMockAuth(context, "admin");
+
+  await page.goto("/app/battles");
+  await expect(page.getByRole("heading", { name: "Battle Lobby" })).toBeVisible();
+
+  await expect(page.getByTestId("ranked-queue-card")).toBeVisible();
+  await page.getByTestId("ranked-queue-join").click();
+
+  await expect(page).toHaveURL(/\/app\/battles\/room\?battleId=/);
+  await expect(page.getByRole("heading", { name: "Battle Room" })).toBeVisible();
+});
