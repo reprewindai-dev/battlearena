@@ -5,6 +5,7 @@ const BASE_URL = "http://127.0.0.1:3000";
 async function setMockAuth(
   context: BrowserContext,
   role: "user" | "admin",
+  userId: string = "mock-user",
 ) {
   await context.addCookies([
     {
@@ -17,6 +18,13 @@ async function setMockAuth(
     {
       name: "arena_role",
       value: role,
+      url: BASE_URL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+    {
+      name: "arena_mock_user_id",
+      value: userId,
       url: BASE_URL,
       httpOnly: true,
       sameSite: "Lax",
@@ -54,15 +62,35 @@ test("battle room loads in skeleton state", async ({ context, page }) => {
   await expect(page.getByTestId("vote-slot")).toBeVisible();
 });
 
-test("ranked queue joins and redirects to battle room", async ({ context, page }) => {
-  await setMockAuth(context, "admin");
+test("ranked queue matches two users into the same battle", async ({ browser }) => {
+  const contextA = await browser.newContext();
+  const contextB = await browser.newContext();
 
-  await page.goto("/app/battles");
-  await expect(page.getByRole("heading", { name: "Battle Lobby" })).toBeVisible();
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
 
-  await expect(page.getByTestId("ranked-queue-card")).toBeVisible();
-  await page.getByTestId("ranked-queue-join").click();
+  await setMockAuth(contextA, "admin", "mock-user-a");
+  await setMockAuth(contextB, "admin", "mock-user-b");
 
-  await expect(page).toHaveURL(/\/app\/battles\/room\?battleId=/);
-  await expect(page.getByRole("heading", { name: "Battle Room" })).toBeVisible();
+  await pageA.goto("/app/battles");
+  await pageB.goto("/app/battles");
+
+  await expect(pageA.getByTestId("ranked-queue-card")).toBeVisible();
+  await expect(pageB.getByTestId("ranked-queue-card")).toBeVisible();
+
+  await pageA.getByTestId("ranked-queue-join").click();
+  await pageB.getByTestId("ranked-queue-join").click();
+
+  await expect(pageA).toHaveURL(/\/app\/battles\/room\?battleId=/);
+  await expect(pageB).toHaveURL(/\/app\/battles\/room\?battleId=/);
+
+  const battleIdA = new URL(pageA.url()).searchParams.get("battleId");
+  const battleIdB = new URL(pageB.url()).searchParams.get("battleId");
+
+  expect(battleIdA).toBeTruthy();
+  expect(battleIdB).toBeTruthy();
+  expect(battleIdA).toBe(battleIdB);
+
+  await contextA.close();
+  await contextB.close();
 });

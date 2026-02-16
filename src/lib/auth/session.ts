@@ -13,7 +13,12 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     const cookieStore = await cookies();
     const mockSession = cookieStore.get("arena_mock_session")?.value === "1";
     if (!mockSession) return null;
-    return mockUser;
+    const mockUserId = cookieStore.get("arena_mock_user_id")?.value;
+    const mockEmail = cookieStore.get("arena_mock_email")?.value;
+    return {
+      id: typeof mockUserId === "string" && mockUserId.length > 0 ? mockUserId : mockUser.id,
+      email: typeof mockEmail === "string" && mockEmail.length > 0 ? mockEmail : mockUser.email,
+    };
   }
 
   const supabase = await createSupabaseServerClient();

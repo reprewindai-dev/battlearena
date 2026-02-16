@@ -52,10 +52,15 @@ create table if not exists public.matchmaking_queue (
   mode text not null default 'freestyle',
   status public.matchmaking_status not null default 'queued',
   battle_id uuid references public.battles(id) on delete set null,
+  rating_at_enqueue numeric,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, mode, status)
 );
+
+create unique index if not exists matchmaking_queue_queued_idx
+  on public.matchmaking_queue (user_id, mode)
+  where status = 'queued';
 
 create index if not exists matchmaking_queue_status_created_at_idx
   on public.matchmaking_queue (status, created_at);
@@ -96,6 +101,7 @@ declare
   v_other_row public.matchmaking_queue%rowtype;
   v_battle_id uuid;
   v_existing jsonb;
+  v_wait_self numeric;
 begin
   v_self_id := auth.uid();
   if v_self_id is null then
@@ -110,21 +116,62 @@ begin
   insert into public.idempotency_keys(key) values (p_idempotency_key);
 
   -- Ensure we have a queued row
-  insert into public.matchmaking_queue(user_id, mode, status)
-  values (v_self_id, p_mode, 'queued')
+  insert into public.matchmaking_queue(user_id, mode, status, rating_at_enqueue)
+  values (
+    v_self_id,
+    p_mode,
+    'queued',
+    (
+      select rating
+      from public.ratings
+      where user_id = v_self_id
+      limit 1
+    )
+  )
   on conflict (user_id, mode, status) do update
-    set updated_at = now()
+    set updated_at = now(),
+        rating_at_enqueue = excluded.rating_at_enqueue
   returning * into v_self_row;
 
-  -- Try find opponent
-  select * into v_other_row
+  -- Lock our own queued row to prevent double-matches if the client hammers enqueue.
+  select * into v_self_row
   from public.matchmaking_queue
-  where status = 'queued'
-    and mode = p_mode
-    and user_id <> v_self_id
-  order by created_at asc
-  limit 1
-  for update skip locked;
+  where id = v_self_row.id
+  for update;
+
+  v_wait_self := extract(epoch from (now() - v_self_row.created_at));
+
+  -- Try find opponent
+  if p_mode = 'ranked' then
+    -- Ranked matching: rating window starts at ±100, expands by +50 every 10s, caps at ±400.
+    -- Use the enqueued rating snapshot for stability.
+    select * into v_other_row
+    from public.matchmaking_queue q
+    where q.status = 'queued'
+      and q.mode = p_mode
+      and q.user_id <> v_self_id
+      and q.rating_at_enqueue is not null
+      and v_self_row.rating_at_enqueue is not null
+      and abs(q.rating_at_enqueue - v_self_row.rating_at_enqueue) <= (
+        least(
+          400,
+          100 + 50 * floor((least(v_wait_self, extract(epoch from (now() - q.created_at)))) / 10)
+        )
+      )
+    order by q.created_at asc
+    limit 1
+    for update skip locked;
+  else
+    -- Freestyle matching: first-come-first-served.
+    select * into v_other_row
+    from public.matchmaking_queue
+    where status = 'queued'
+      and mode = p_mode
+      and user_id <> v_self_id
+    order by created_at asc
+    limit 1
+    for update skip locked;
+  end if;
 
   if v_other_row.id is null then
     return jsonb_build_object('ok', true, 'matched', false, 'queue_id', v_self_row.id);

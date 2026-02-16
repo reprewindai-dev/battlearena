@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
+import { mockEnqueue } from "@/lib/matchmaking/mock";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -19,11 +20,12 @@ export async function POST(req: Request) {
   const resolvedMode = typeof mode === "string" && mode.length > 0 ? mode : "freestyle";
 
   if (isMockAuthEnabled) {
+    const row = mockEnqueue(user.id, resolvedMode);
     return NextResponse.json({
       ok: true,
       mode: "mock",
-      matched: true,
-      battleId: `mock_${crypto.randomUUID()}`,
+      matched: row.status === "matched",
+      battleId: row.battleId,
     });
   }
 
