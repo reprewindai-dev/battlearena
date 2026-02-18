@@ -36,6 +36,10 @@ export function VideoBattle({ localSlot, mode, onStreamReady }: VideoBattleProps
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
+        // Ensure audio plays through speakers (local video is muted, but audio routing is set)
+        if (localVideoRef.current) {
+          localVideoRef.current.muted = true; // Always mute local to avoid feedback
+        }
       } catch (err) {
         setError("Camera/microphone access denied or unavailable.");
         console.error("Failed to get local media:", err);
@@ -58,17 +62,49 @@ export function VideoBattle({ localSlot, mode, onStreamReady }: VideoBattleProps
       canvas.height = 480;
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.fillStyle = "#1a1a2e";
-        ctx.fillRect(0, 0, 640, 480);
-        ctx.fillStyle = "#eee";
-        ctx.font = "24px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("Opponent (Mock)", 320, 240);
-      }
-      const mockStream = canvas.captureStream(30);
-      setRemoteStream(mockStream);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = mockStream;
+        // Reduce flicker by drawing once and reusing the frame
+        const drawFrame = () => {
+          ctx.fillStyle = "#1a1a2e";
+          ctx.fillRect(0, 0, 640, 480);
+          ctx.fillStyle = "#eee";
+          ctx.font = "24px sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Opponent (Mock)", 320, 240);
+        };
+        drawFrame();
+        
+        // Capture at lower fps to reduce flicker
+        const mockStream = canvas.captureStream(10);
+        
+        // Add mock audio track for testing
+        try {
+          const audioContext = new AudioContext();
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          // Create a silent audio track (just for testing)
+          const audioDestination = audioContext.createMediaStreamDestination();
+          gainNode.connect(audioDestination);
+          
+          // Add audio track to mock video stream
+          audioDestination.stream.getAudioTracks().forEach(track => {
+            mockStream.addTrack(track);
+          });
+          
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.1); // Brief tone
+        } catch {
+          // If audio fails, continue without mock audio
+        }
+        
+        setRemoteStream(mockStream);
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = mockStream;
+          remoteVideoRef.current.muted = false; // Ensure remote audio plays
+        }
       }
     }
   }, [mode, remoteStream]);
