@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")
-    .select("id,created_by,status,voting_opened_at,voting_closes_at")
+    .select("id,created_by,status,voting_opened_at,voting_closes_at,result")
     .eq("id", battleId)
     .maybeSingle();
 
@@ -58,6 +58,16 @@ export async function POST(req: Request) {
   const allowed = battle.created_by === user.id || isModOrAdmin(role);
   if (!allowed) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  // Enforce: cannot finalize before voting closes
+  if (battle.voting_closes_at && new Date(battle.voting_closes_at) > new Date()) {
+    return NextResponse.json({ error: "voting_not_closed" }, { status: 400 });
+  }
+
+  // Enforce: cannot finalize more than once (idempotency via result presence)
+  if (battle.result && typeof battle.result === "object" && "finalized_at" in battle.result) {
+    return NextResponse.json({ ok: true, mode: "supabase", battleId, result: battle.result, idempotent: true });
   }
 
   const { data: votes, error: votesError } = await supabase
@@ -87,6 +97,7 @@ export async function POST(req: Request) {
     finalized_at: finalizedAt,
     counts: { 1: countA, 2: countB },
     winner_slot: winnerSlot,
+    reason: "vote_counts",
   };
 
   const { error: updateParticipantsError } = await supabase
@@ -132,7 +143,8 @@ export async function POST(req: Request) {
     }
   }
 
-  const idempotencyKey = `finalize:${battleId}:${finalizedAt}`;
+  // Stable per-battle idempotency key (allows retry without double-finalize)
+  const idempotencyKey = `finalize:${battleId}`;
   const { data: rpcData, error: rpcError } = await supabase.rpc("record_battle_result", {
     p_idempotency_key: idempotencyKey,
     p_battle_id: battleId,
@@ -146,7 +158,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const ratingsIdempotencyKey = `elo:${battleId}:${finalizedAt}`;
+  // Stable per-battle Elo idempotency key
+  const ratingsIdempotencyKey = `elo:${battleId}`;
   const { data: eloData, error: eloError } = await supabase.rpc("apply_battle_elo_ratings", {
     p_idempotency_key: ratingsIdempotencyKey,
     p_battle_id: battleId,
@@ -155,10 +168,16 @@ export async function POST(req: Request) {
 
   if (eloError) {
     return NextResponse.json(
-      { ok: true, mode: "supabase", battleId, result, rpc: rpcData, ratings_error: eloError.message },
+      { ok: true, mode: "supabase", battleId, result, rpc: rpcData, ratings_error: eloError.message, idempotent: false },
       { status: 200 },
     );
   }
 
-  return NextResponse.json({ ok: true, mode: "supabase", battleId, result, rpc: rpcData, elo: eloData });
+  // Enrich result with rating deltas if Elo succeeded
+  const enrichedResult = {
+    ...result,
+    rating_deltas: eloData?.elo ?? null,
+  };
+
+  return NextResponse.json({ ok: true, mode: "supabase", battleId, result: enrichedResult, rpc: rpcData, elo: eloData, idempotent: false });
 }
