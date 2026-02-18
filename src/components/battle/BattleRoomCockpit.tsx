@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
+import { VideoBattle } from "@/components/battle/VideoBattle";
 import { useBattleSessionStore, type BattleSessionMode } from "@/lib/battle/session-store";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
@@ -1180,6 +1181,18 @@ export function BattleRoomCockpit() {
           </div>
         </div>
       </Card>
+
+      {/* Video Battle UI */}
+      {sessionId ? (
+        <VideoBattle
+          localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
+          mode={sessionMode ?? "mock"}
+          onStreamReady={(stream) => {
+            // Optional: handle stream ready for recording/broadcast
+            console.log("Local video stream ready:", stream);
+          }}
+        />
+      ) : null}
 
       {sessionError ? (
         <div className="text-xs text-amber-200/90">{sessionError}</div>
