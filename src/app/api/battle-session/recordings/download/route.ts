@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -16,11 +15,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "missing_recordingId" }, { status: 400 });
   }
 
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock", url: "" });
-  }
-
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: row, error } = await supabase
     .from("battle_recordings")

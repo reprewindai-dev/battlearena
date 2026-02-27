@@ -8,7 +8,7 @@ export async function createSupabaseServerClient() {
   const cookieStore = await cookies();
 
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    throw new Error("Supabase is not configured.");
+    return null; // Return null instead of throwing error
   }
 
   return createServerClient(

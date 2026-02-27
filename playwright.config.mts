@@ -29,8 +29,14 @@ export default defineConfig({
     env: {
       ...process.env,
       ARENA_FORCE_MOCK_AUTH: "1",
+      NEXT_PUBLIC_ARENA_FORCE_MOCK_AUTH: "1",
+      MOCK_AUTH: "true",
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://localhost:54321",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.mock.mock.mock.mock",
     },
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

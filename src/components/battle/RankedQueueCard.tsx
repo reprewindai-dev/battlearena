@@ -1,98 +1,134 @@
 "use client";
 
-import * as React from "react";
-
-import { useRouter } from "next/navigation";
-
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
+import { enqueue, getStatus } from "@/lib/matchmaking/client";
+import { getClientSessionUser } from "@/lib/auth/client-session";
 
 export function RankedQueueCard() {
-  const router = useRouter();
+  const [isQueued, setIsQueued] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
-  const [error, setError] = React.useState<string | null>(null);
-  const [isJoining, setIsJoining] = React.useState(false);
-  const [isPolling, setIsPolling] = React.useState(false);
+  useEffect(() => {
+    const loadUser = async () => {
+      const sessionUser = await getClientSessionUser();
+      setUser(sessionUser);
+    };
+    loadUser();
+  }, []);
 
-  async function pollOnce() {
-    const res = await fetch("/api/matchmaking/status?mode=ranked");
-    const body = (await res.json()) as
-      | { ok: true; status: string; battleId: string | null }
-      | { error: string; details?: string };
-
-    if (!res.ok || !("ok" in body)) {
-      return { status: "error", battleId: null } as const;
-    }
-
-    return { status: body.status, battleId: body.battleId } as const;
-  }
-
-  async function joinQueue() {
-    setIsJoining(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/matchmaking/enqueue", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "ranked" }),
-      });
-      const body = (await res.json()) as
-        | { ok: true; matched: boolean; battleId: string | null }
-        | { error: string; details?: string };
-
-      if (!res.ok || !("ok" in body)) {
-        setError("Unable to join queue.");
-        return;
-      }
-
-      if (body.matched && body.battleId) {
-        router.push(`/app/battles/room?battleId=${encodeURIComponent(body.battleId)}`);
-        return;
-      }
-
-      setIsPolling(true);
-      const startedAt = Date.now();
-      while (Date.now() - startedAt < 30_000) {
-        await new Promise((r) => window.setTimeout(r, 1500));
-        const status = await pollOnce();
-        if (status.status === "matched" && status.battleId) {
-          router.push(`/app/battles/room?battleId=${encodeURIComponent(status.battleId)}`);
-          return;
+  useEffect(() => {
+    if (isQueued && user) {
+      const interval = setInterval(async () => {
+        const status = await getStatus(user.id, 'ranked');
+        setQueueStatus(status);
+        
+        if (status?.status === 'matched') {
+          setIsQueued(false);
+          // Navigate to battle
+          window.location.href = `/app/battles/room/${status.battle_id}`;
         }
-      }
-
-      setError("Still queued. Try again in a moment.");
-    } catch {
-      setError("Unable to join queue.");
-    } finally {
-      setIsPolling(false);
-      setIsJoining(false);
+      }, 2000);
+      
+      return () => clearInterval(interval);
     }
-  }
+  }, [isQueued, user]);
+
+  const handleJoinQueue = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const result = await enqueue(user.id, 'ranked');
+      setQueueStatus(result);
+      
+      if (result.status === 'matched') {
+        // Navigate directly to battle
+        window.location.href = `/app/battles/room/${result.battle_id}`;
+      } else {
+        setIsQueued(true);
+      }
+    } catch (error) {
+      console.error('Failed to join queue:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeaveQueue = async () => {
+    if (!user) return;
+    
+    try {
+      await enqueue(user.id, 'ranked'); // This will handle leaving
+      setIsQueued(false);
+      setQueueStatus(null);
+    } catch (error) {
+      console.error('Failed to leave queue:', error);
+    }
+  };
 
   return (
-    <Card
-      data-testid="ranked-queue-card"
-      className="border-border/60 bg-card/40 p-5 backdrop-blur"
-    >
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Ranked queue</div>
-        <Badge variant="secondary">live</Badge>
+    <Card className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold">Ranked Battles</h3>
+          <p className="text-sm text-gray-600">Compete for ELO rating and prizes</p>
+        </div>
+        <Badge variant="default" className="bg-red-500">RANKED</Badge>
       </div>
-      <div className="mt-2 text-sm text-muted-foreground">
-        Matchmaking MVP (same pairing logic as freestyle; mode=ranked).
-      </div>
-      <div className="mt-4 flex items-center gap-3">
-        <Button
-          data-testid="ranked-queue-join"
-          onClick={() => void joinQueue()}
-          disabled={isJoining || isPolling}
-        >
-          {isPolling ? "Searching…" : isJoining ? "Joining…" : "Join queue"}
-        </Button>
-        {error ? <div className="text-xs text-amber-200/90">{error}</div> : null}
+
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="font-medium">Format:</span>
+            <p className="text-gray-600">60s rounds</p>
+          </div>
+          <div>
+            <span className="font-medium">Entry:</span>
+            <p className="text-gray-600">$5.00</p>
+          </div>
+          <div>
+            <span className="font-medium">Prize:</span>
+            <p className="text-gray-600">$10.00</p>
+          </div>
+          <div>
+            <span className="font-medium">ELO:</span>
+            <p className="text-gray-600">Rating based</p>
+          </div>
+        </div>
+
+        {isQueued ? (
+          <div className="space-y-3">
+            <div className="text-center">
+              <div className="animate-pulse">
+                <p className="text-sm text-gray-600">Finding opponent...</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Queue time: {Math.floor((Date.now() - new Date(queueStatus?.created_at || Date.now()).getTime()) / 1000)}s
+                </p>
+              </div>
+            </div>
+            <Button 
+              onClick={handleLeaveQueue}
+              variant="outline"
+              className="w-full"
+              disabled={loading}
+            >
+              Leave Queue
+            </Button>
+          </div>
+        ) : (
+          <Button 
+            onClick={handleJoinQueue}
+            className="w-full"
+            disabled={loading || !user}
+          >
+            {loading ? "Joining..." : "Join Ranked Queue"}
+          </Button>
+        )}
       </div>
     </Card>
   );

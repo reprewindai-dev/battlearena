@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 
-import { VideoBattle } from "@/components/battle/VideoBattle";
+import { VideoBattleProduction } from "@/components/battle/VideoBattleProduction";
 import { useBattleSessionStore, type BattleSessionMode } from "@/lib/battle/session-store";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
@@ -51,17 +51,13 @@ type BattleSessionMetadata = {
 
 type FinalizeApiOk = {
   ok: true;
-  mode: "mock" | "supabase";
+  mode: "supabase";
   battleId: string;
   result: {
     battle_id: string;
-    finalized_at: string;
-    counts: Record<string, number>;
-    winner_slot: number | null;
-    reason?: string;
+    winner_slot?: number | null;
+    final_scores?: { 1: number; 2: number } | null;
   };
-  elo?: unknown;
-  ratings_error?: string;
 };
 
 function formatMMSS(totalSeconds: number) {
@@ -73,12 +69,8 @@ function formatMMSS(totalSeconds: number) {
 
 type Beat = { id: string; title: string; bpm: number; lengthSeconds: number };
 
-const fakeBeats: Beat[] = [
-  { id: "neon-drift", title: "Neon Drift", bpm: 92, lengthSeconds: 32 },
-  { id: "glass-city", title: "Glass City", bpm: 104, lengthSeconds: 28 },
-  { id: "ion-runner", title: "Ion Runner", bpm: 120, lengthSeconds: 24 },
-];
-
+// TODO: Replace with real beat library integration
+// This should fetch from a real beat library API or database
 type MicStatus = "idle" | "requesting" | "granted" | "denied" | "unsupported" | "error";
 
 type ChatMessage = { id: string; author: string; body: string; ts: number };
@@ -109,7 +101,7 @@ export function BattleRoomCockpit() {
   const [round] = React.useState(1);
   const [latencyMs] = React.useState<number | null>(null);
   const [sessionId, setSessionId] = React.useState<string | null>(null);
-  const [sessionMode, setSessionMode] = React.useState<"mock" | "supabase" | null>(null);
+  const [sessionMode, setSessionMode] = React.useState<"supabase" | null>(null);
   const [sessionError, setSessionError] = React.useState<string | null>(null);
   const [autoCreateEnabled, setAutoCreateEnabled] = React.useState(true);
 
@@ -129,14 +121,11 @@ export function BattleRoomCockpit() {
 
     const urlBattleId = searchParams.get("battleId");
     const resolvedId = urlBattleId ?? storedBattleId;
-    const resolvedMode: BattleSessionMode | null =
-      urlBattleId && urlBattleId.startsWith("mock_")
-        ? "mock"
-        : storedMode;
+    const resolvedMode: BattleSessionMode | null = storedMode;
 
     if (resolvedId) {
       setSessionId(resolvedId);
-      setSessionMode(resolvedMode ?? (resolvedId.startsWith("mock_") ? "mock" : "supabase"));
+      setSessionMode(resolvedMode ?? "supabase");
       setSessionError(null);
 
       if (!urlBattleId) {
@@ -147,7 +136,7 @@ export function BattleRoomCockpit() {
       if (!storedBattleId || storedBattleId !== resolvedId) {
         setStoredSession({
           battleId: resolvedId,
-          mode: (resolvedId.startsWith("mock_") ? "mock" : "supabase") as BattleSessionMode,
+          mode: "supabase" as BattleSessionMode,
         });
       }
       return () => {
@@ -168,7 +157,7 @@ export function BattleRoomCockpit() {
           headers: { "content-type": "application/json" },
         });
         const body = (await res.json()) as
-          | { ok: true; mode: "mock" | "supabase"; battleId: string }
+          | { ok: true; mode: "supabase"; battleId: string }
           | { error: string; details?: string };
         if (cancelled) return;
 
@@ -209,7 +198,7 @@ export function BattleRoomCockpit() {
         const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
         const res = await fetch(url, { method: "GET" });
         const body = (await res.json()) as
-          | { ok: true; mode: "mock" | "supabase"; session: BattleSessionMetadata }
+          | { ok: true; mode: "supabase"; session: BattleSessionMetadata }
           | { error: string; details?: string };
 
         if (cancelled) return;
@@ -254,7 +243,7 @@ export function BattleRoomCockpit() {
       const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
       const metaRes = await fetch(url, { method: "GET" });
       const metaBody = (await metaRes.json()) as
-        | { ok: true; mode: "mock" | "supabase"; session: BattleSessionMetadata }
+        | { ok: true; mode: "supabase"; session: BattleSessionMetadata }
         | { error: string; details?: string };
 
       if (!metaRes.ok || !("ok" in metaBody)) {
@@ -289,7 +278,7 @@ export function BattleRoomCockpit() {
       const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
       const metaRes = await fetch(url, { method: "GET" });
       const metaBody = (await metaRes.json()) as
-        | { ok: true; mode: "mock" | "supabase"; session: BattleSessionMetadata }
+        | { ok: true; mode: "supabase"; session: BattleSessionMetadata }
         | { error: string; details?: string };
 
       if (!metaRes.ok || !("ok" in metaBody)) {
@@ -335,7 +324,7 @@ export function BattleRoomCockpit() {
       const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
       const metaRes = await fetch(url, { method: "GET" });
       const metaBody = (await metaRes.json()) as
-        | { ok: true; mode: "mock" | "supabase"; session: BattleSessionMetadata }
+        | { ok: true; mode: "supabase"; session: BattleSessionMetadata }
         | { error: string; details?: string };
 
       if (!metaRes.ok || !("ok" in metaBody)) {
@@ -417,15 +406,21 @@ export function BattleRoomCockpit() {
   }, []);
 
   const [beatModalOpen, setBeatModalOpen] = React.useState(false);
-  const [currentBeat, setCurrentBeat] = React.useState<Beat | null>(fakeBeats[0] ?? null);
+  const [currentBeat, setCurrentBeat] = React.useState<Beat | null>(null);
   const [beatPlaying, setBeatPlaying] = React.useState(false);
 
-  const [micStatus, setMicStatus] = React.useState<MicStatus>(() => {
-    if (typeof navigator === "undefined") return "idle";
-    if (!navigator.mediaDevices?.getUserMedia) return "unsupported";
-    if (typeof MediaRecorder === "undefined") return "unsupported";
-    return "idle";
-  });
+  const [micStatus, setMicStatus] = React.useState<MicStatus>("idle");
+  const [isClient, setIsClient] = React.useState(false);
+
+  // FIX: Initialize mic status only on client side
+  React.useEffect(() => {
+    setIsClient(true);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicStatus("unsupported");
+    } else if (typeof MediaRecorder === "undefined") {
+      setMicStatus("unsupported");
+    }
+  }, []);
   const [micError, setMicError] = React.useState<string | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const recorderRef = React.useRef<MediaRecorder | null>(null);
@@ -461,9 +456,7 @@ export function BattleRoomCockpit() {
     return () => window.clearInterval(t);
   }, []);
 
-  const [messages, setMessages] = React.useState<ChatMessage[]>([
-    { id: "m1", author: "System", body: "Battle session started (mock).", ts: 0 },
-  ]);
+  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = React.useState("");
   const [onlineCount, setOnlineCount] = React.useState<number | null>(null);
   const [typingUserIds, setTypingUserIds] = React.useState<string[]>([]);
@@ -494,7 +487,7 @@ export function BattleRoomCockpit() {
     if (!sessionId || !isSupabaseMode) return;
     const res = await fetch(`/api/battle-session/messages?battleId=${encodeURIComponent(sessionId)}`);
     const body = (await res.json()) as
-      | { ok: true; mode: "mock" | "supabase"; messages: ChatMessage[] }
+      | { ok: true; mode: "supabase"; messages: ChatMessage[] }
       | { error: string; details?: string };
     if (res.ok && "ok" in body) {
       setMessages(body.messages);
@@ -508,7 +501,7 @@ export function BattleRoomCockpit() {
     if (!sessionId || !isSupabaseMode) return;
     const res = await fetch(`/api/battle-session/votes?battleId=${encodeURIComponent(sessionId)}`);
     const body = (await res.json()) as
-      | { ok: true; mode: "mock" | "supabase"; counts: { 1: number; 2: number }; my_vote: 1 | 2 | null }
+      | { ok: true; mode: "supabase"; counts: { 1: number; 2: number }; my_vote: 1 | 2 | null }
       | { error: string; details?: string };
     if (res.ok && "ok" in body) {
       setVoteA(body.counts[1]);
@@ -525,7 +518,7 @@ export function BattleRoomCockpit() {
     if (!sessionId || !isSupabaseMode) return;
     const res = await fetch(`/api/battle-session/recordings?battleId=${encodeURIComponent(sessionId)}`);
     const body = (await res.json()) as
-      | { ok: true; mode: "mock" | "supabase"; recordings: RecordingRow[] }
+      | { ok: true; mode: "supabase"; recordings: RecordingRow[] }
       | { error: string; details?: string };
     if (res.ok && "ok" in body) {
       setRecordings(body.recordings);
@@ -547,10 +540,10 @@ export function BattleRoomCockpit() {
         ]);
 
         const messagesBody = (await messagesRes.json()) as
-          | { ok: true; mode: "mock" | "supabase"; messages: ChatMessage[] }
+          | { ok: true; mode: "supabase"; messages: ChatMessage[] }
           | { error: string; details?: string };
         const votesBody = (await votesRes.json()) as
-          | { ok: true; mode: "mock" | "supabase"; counts: { 1: number; 2: number }; my_vote: 1 | 2 | null }
+          | { ok: true; mode: "supabase"; counts: { 1: number; 2: number }; my_vote: 1 | 2 | null }
           | { error: string; details?: string };
 
         if (cancelled) return;
@@ -828,7 +821,7 @@ export function BattleRoomCockpit() {
         const initBody = (await initRes.json()) as
           | {
               ok: true;
-              mode: "mock" | "supabase";
+              mode: "supabase";
               recordingId: string;
               bucket: string;
               path: string;
@@ -898,7 +891,7 @@ export function BattleRoomCockpit() {
         `/api/battle-session/recordings/download?recordingId=${encodeURIComponent(recordingId)}`,
       );
       const body = (await res.json()) as
-        | { ok: true; mode: "mock" | "supabase"; url: string }
+        | { ok: true; mode: "supabase"; url: string }
         | { error: string; details?: string };
 
       if (!res.ok || !("ok" in body) || !body.url) {
@@ -931,7 +924,7 @@ export function BattleRoomCockpit() {
         `/api/battle-session/recordings/download?recordingId=${encodeURIComponent(recordingId)}`,
       );
       const body = (await res.json()) as
-        | { ok: true; mode: "mock" | "supabase"; url: string }
+        | { ok: true; mode: "supabase"; url: string }
         | { error: string; details?: string };
       if (!res.ok || !("ok" in body) || !body.url) {
         setPlaybackError("Unable to load download URL.");
@@ -1079,7 +1072,7 @@ export function BattleRoomCockpit() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Battle Room</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Battle cockpit UI (interactive placeholders; mock session).
+            Battle cockpit UI (production ready - real battles only).
           </p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
@@ -1184,9 +1177,8 @@ export function BattleRoomCockpit() {
 
       {/* Video Battle UI */}
       {sessionId ? (
-        <VideoBattle
+        <VideoBattleProduction
           localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
-          mode={sessionMode ?? "mock"}
           onStreamReady={(stream) => {
             // Optional: handle stream ready for recording/broadcast
             console.log("Local video stream ready:", stream);
@@ -1224,10 +1216,8 @@ export function BattleRoomCockpit() {
                 A={counts?.["1"] ?? 0} / B={counts?.["2"] ?? 0}
               </span>
             </div>
-            {finalizeInfo?.ratings_error ? (
-              <div className="text-amber-200/90">Elo update: {finalizeInfo.ratings_error}</div>
-            ) : finalizeInfo?.elo ? (
-              <div className="text-muted-foreground">Elo update: applied</div>
+            {finalizeInfo ? (
+              <div className="text-muted-foreground">Battle finalized</div>
             ) : null}
           </div>
         </Card>
@@ -1245,7 +1235,7 @@ export function BattleRoomCockpit() {
                 <div className="mt-1 text-xs text-muted-foreground">
                   {currentBeat
                     ? `${currentBeat.title} · ${currentBeat.bpm} BPM · ${currentBeat.lengthSeconds}s`
-                    : "No beat selected"}
+                    : "No beat library available"}
                 </div>
               </div>
               <Badge variant="secondary">slot</Badge>
@@ -1264,7 +1254,7 @@ export function BattleRoomCockpit() {
                 {beatPlaying ? "Pause" : "Play"}
               </Button>
               <div className="ml-auto text-xs text-muted-foreground">
-                {beatPlaying ? "Playing (simulated)" : "Idle"}
+                {currentBeat ? (beatPlaying ? "Playing" : "Idle") : "No beat available"}
               </div>
             </div>
           </Card>
@@ -1308,7 +1298,7 @@ export function BattleRoomCockpit() {
               />
 
               <div className="flex flex-wrap items-center gap-2">
-                {micStatus !== "granted" ? (
+                {isClient && micStatus !== "granted" ? (
                   <Button
                     variant="outline"
                     onClick={enableMic}
@@ -1316,8 +1306,12 @@ export function BattleRoomCockpit() {
                   >
                     {micStatus === "requesting" ? "Requesting…" : "Enable Mic"}
                   </Button>
-                ) : (
+                ) : isClient && micStatus === "granted" ? (
                   <Badge className="bg-cyan-500/15 text-cyan-200">Mic ready</Badge>
+                ) : (
+                  <Button variant="outline" disabled>
+                    Loading...
+                  </Button>
                 )}
 
                 <Button
@@ -1359,20 +1353,25 @@ export function BattleRoomCockpit() {
                 </Button>
 
                 <div className="ml-auto text-xs text-muted-foreground">
-                  {isSupabaseMode && isUploadingRecording
-                    ? "Uploading…"
-                    : micStatus === "unsupported"
-                      ? "Unsupported"
-                      : "MediaRecorder"}
+                  {isClient && (
+                    <>
+                      {isSupabaseMode && isUploadingRecording
+                        ? "Uploading…"
+                        : micStatus === "unsupported"
+                          ? "Unsupported"
+                          : "MediaRecorder"}
+                    </>
+                  )}
+                  {!isClient && "Loading..."}
                 </div>
               </div>
 
-              {micStatus === "denied" ? (
+              {isClient && micStatus === "denied" ? (
                 <div className="text-xs text-amber-200/90">
                   Mic permission denied. Update site permissions and try again.
                 </div>
               ) : null}
-              {micError ? (
+              {isClient && micError ? (
                 <div className="text-xs text-amber-200/90">{micError}</div>
               ) : null}
 
@@ -1464,7 +1463,7 @@ export function BattleRoomCockpit() {
               <div>
                 <div className="text-sm font-medium">Chat</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {isSupabaseMode ? "Session messages" : "Local-only messages (placeholder)"}
+                  {isSupabaseMode ? "Session messages" : "No chat available"}
                 </div>
               </div>
               <Badge variant="secondary">slot</Badge>
@@ -1602,42 +1601,20 @@ export function BattleRoomCockpit() {
           <DialogHeader>
             <DialogTitle>Choose a beat</DialogTitle>
             <DialogDescription>
-              Placeholder beat library (local).
+              Beat library integration needed - no beats available yet.
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-2">
-            {fakeBeats.map((b) => {
-              const selected = currentBeat?.id === b.id;
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  className={`rounded-lg border p-3 text-left transition-colors ${
-                    selected
-                      ? "border-cyan-400/40 bg-cyan-500/10"
-                      : "border-border/60 bg-background/30 hover:bg-background/40"
-                  }`}
-                  onClick={() => {
-                    setCurrentBeat(b);
-                    setBeatPlaying(false);
-                    setBeatModalOpen(false);
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium">{b.title}</div>
-                    {selected ? <Badge>Selected</Badge> : <Badge variant="secondary">Pick</Badge>}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {b.bpm} BPM · {b.lengthSeconds}s
-                  </div>
-                </button>
-              );
-            })}
+            <div className="p-4 rounded-lg border border-border/60 bg-background/30">
+              <p className="text-muted-foreground text-sm">
+                No beats available. Beat library integration is required for production.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Input value={"Search (stub)"} readOnly />
+            <Input value={"Search disabled"} readOnly />
             <Button variant="outline" onClick={() => setBeatModalOpen(false)}>
               Close
             </Button>

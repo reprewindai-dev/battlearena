@@ -5,15 +5,11 @@ const protectedPrefixes = ["/app"];
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (!protectedPrefixes.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
-  }
-
+  // Allow mock session (Playwright helper)
   const mockSession = req.cookies.get("arena_mock_session")?.value === "1";
   const supabaseAuthCookie = req.cookies.get("sb-access-token") || req.cookies.get("sb:token");
 
-  const isLoggedIn = mockSession || !!supabaseAuthCookie;
-  if (!isLoggedIn) {
+  if (pathname.startsWith("/app") && !mockSession && !supabaseAuthCookie) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

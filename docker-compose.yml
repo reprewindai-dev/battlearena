@@ -1,0 +1,172 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: arena_postgres
+    environment:
+      POSTGRES_DB: arena_v2
+      POSTGRES_USER: arena_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - arena_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: arena_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - arena_network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: arena_auth
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://arena_user:${DB_PASSWORD}@postgres:5432/arena_v2
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - arena_network
+
+  # Battle Service
+  battle-service:
+    build:
+      context: ./backend/battle-service
+      dockerfile: Dockerfile
+    container_name: arena_battle
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://arena_user:${DB_PASSWORD}@postgres:5432/arena_v2
+      REDIS_URL: redis://redis:6379
+      WEBRTC_STUN_SERVER: ${WEBRTC_STUN_SERVER}
+      WEBRTC_TURN_SERVER: ${WEBRTC_TURN_SERVER}
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - arena_network
+
+  # Economy Service
+  economy-service:
+    build:
+      context: ./backend/economy-service
+      dockerfile: Dockerfile
+    container_name: arena_economy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://arena_user:${DB_PASSWORD}@postgres:5432/arena_v2
+      REDIS_URL: redis://redis:6379
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - arena_network
+
+  # Tournament Service
+  tournament-service:
+    build:
+      context: ./backend/tournament-service
+      dockerfile: Dockerfile
+    container_name: arena_tournament
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://arena_user:${DB_PASSWORD}@postgres:5432/arena_v2
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3004:3004"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - arena_network
+
+  # Moderation Service
+  moderation-service:
+    build:
+      context: ./backend/moderation-service
+      dockerfile: Dockerfile
+    container_name: arena_moderation
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://arena_user:${DB_PASSWORD}@postgres:5432/arena_v2
+      REDIS_URL: redis://redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "3005:3005"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - arena_network
+
+  # Web Frontend
+  web-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: arena_web
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:8080/v1
+      NEXT_PUBLIC_SUPABASE_URL: ${SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - battle-service
+      - economy-service
+      - tournament-service
+      - moderation-service
+    networks:
+      - arena_network
+
+  # API Gateway (Nginx)
+  api-gateway:
+    image: nginx:alpine
+    container_name: arena_gateway
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infrastructure/nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - auth-service
+      - battle-service
+      - economy-service
+      - tournament-service
+      - moderation-service
+    networks:
+      - arena_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  arena_network:
+    driver: bridge

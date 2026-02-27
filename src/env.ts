@@ -11,6 +11,7 @@ export const env = createEnv({
   client: {
     NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
     NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
+    NEXT_PUBLIC_ARENA_FORCE_MOCK_AUTH: z.enum(["0", "1"]).optional(),
   },
   runtimeEnv: {
     SUPABASE_URL: process.env.SUPABASE_URL,
@@ -19,6 +20,7 @@ export const env = createEnv({
     CRON_CLEANUP_SECRET: process.env.CRON_CLEANUP_SECRET,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_ARENA_FORCE_MOCK_AUTH: process.env.NEXT_PUBLIC_ARENA_FORCE_MOCK_AUTH,
   },
   emptyStringAsUndefined: true,
 });

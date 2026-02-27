@@ -1,0 +1,56 @@
+<!-- BattleArena Premium Logo SVG -->
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#F7931E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFD23F;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="logoGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1A1A2E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213E;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Outer hexagon -->
+  <polygon
+    points="100,10 170,55 170,145 100,190 30,145 30,55"
+    fill="none"
+    stroke="url(#logoGradient1)"
+    stroke-width="4"
+    filter="url(#glow)"
+  />
+  
+  <!-- Inner hexagon -->
+  <polygon
+    points="100,40 140,65 140,135 100,160 60,135 60,65"
+    fill="url(#logoGradient2)"
+    stroke="url(#logoGradient1)"
+    stroke-width="3"
+  />
+  
+  <!-- Battle swords cross -->
+  <g transform="translate(100, 100)">
+    <!-- Left sword -->
+    <rect x="-3" y="-50" width="6" height="70" fill="url(#logoGradient1)" />
+    <polygon points="-3,-50 3,-50 0,-60" fill="url(#logoGradient1)" />
+    <rect x="-6" y="20" width="12" height="6" fill="url(#logoGradient1)" />
+    
+    <!-- Right sword -->
+    <rect x="-3" y="-50" width="6" height="70" fill="url(#logoGradient1)" transform="rotate(90)" />
+    <polygon points="-3,-50 3,-50 0,-60" fill="url(#logoGradient1)" transform="rotate(90)" />
+    <rect x="-6" y="20" width="12" height="6" fill="url(#logoGradient1)" transform="rotate(90)" />
+  </g>
+  
+  <!-- Arena text -->
+  <text x="100" y="185" text-anchor="middle" fill="url(#logoGradient1)" fontSize="16" fontWeight="bold" fontFamily="Arial Black, sans-serif">
+    ARENA
+  </text>
+</svg>

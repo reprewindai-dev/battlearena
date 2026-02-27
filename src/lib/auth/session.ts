@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-import { isMockAuthEnabled, mockUser, type AppRole } from "@/lib/auth/config";
+import { type AppRole } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type SessionUser = {
@@ -9,26 +9,15 @@ export type SessionUser = {
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  if (isMockAuthEnabled) {
-    const cookieStore = await cookies();
-    const mockSession = cookieStore.get("arena_mock_session")?.value === "1";
-    if (!mockSession) return null;
-    const mockUserId = cookieStore.get("arena_mock_user_id")?.value;
-    const mockEmail = cookieStore.get("arena_mock_email")?.value;
-    return {
-      id: typeof mockUserId === "string" && mockUserId.length > 0 ? mockUserId : mockUser.id,
-      email: typeof mockEmail === "string" && mockEmail.length > 0 ? mockEmail : mockUser.email,
-    };
-  }
-
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error) return null;
-  if (!data.user) return null;
+  if (!supabase) return null;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
   return {
-    id: data.user.id,
-    email: data.user.email ?? null,
+    id: user.id,
+    email: user.email ?? null,
   };
 }
 
@@ -36,13 +25,11 @@ export async function getSessionRole(): Promise<AppRole> {
   const cookieStore = await cookies();
   const role = cookieStore.get("arena_role")?.value;
   if (role === "admin" || role === "mod" || role === "user") return role;
-  if (isMockAuthEnabled) {
-    const mockSession = cookieStore.get("arena_mock_session")?.value === "1";
-    if (mockSession) return "admin";
-  }
 
   try {
     const supabase = await createSupabaseServerClient();
+    if (!supabase) return "user";
+
     const { data } = await supabase.auth.getUser();
     const claim =
       (data.user?.app_metadata as { role?: unknown } | undefined)?.role ??

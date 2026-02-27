@@ -1,5 +1,6 @@
 ---
 description: Run the full local verification suite
+auto_execution_mode: 3
 ---
 
 1. Install dependencies

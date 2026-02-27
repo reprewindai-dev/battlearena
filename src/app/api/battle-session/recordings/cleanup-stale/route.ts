@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
@@ -8,7 +7,7 @@ import { env } from "@/env";
 
 type CleanupResult = {
   ok: true;
-  mode: "mock" | "supabase";
+  mode: "supabase";
   scanned_rows: number;
   deleted_rows: number;
   deleted_objects: number;
@@ -67,25 +66,16 @@ export async function POST(req: Request) {
   const concurrency = concurrencyRaw ? Number(concurrencyRaw) : 4;
   const safeConcurrency = Number.isFinite(concurrency) ? Math.max(1, Math.min(10, Math.floor(concurrency))) : 4;
 
-  if (isMockAuthEnabled) {
-    const res: CleanupResult = {
-      ok: true,
-      mode: "mock",
-      scanned_rows: 0,
-      deleted_rows: 0,
-      deleted_objects: 0,
-      row_delete_errors: 0,
-      object_delete_errors: 0,
-    };
-    return NextResponse.json(res);
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
+  const serviceSupabase = await createSupabaseServiceRoleClient();
+  if (!serviceSupabase) {
+    return NextResponse.json({ error: "Supabase service role not configured" }, { status: 500 });
   }
 
-  const supabase = cronAuthed
-    ? createSupabaseServiceRoleClient()
-    : await createSupabaseServerClient();
-
-  const cutoff = new Date(Date.now() - safeMinutes * 60 * 1000).toISOString();
-
+  const cutoff = new Date(Date.now() - safeMinutes * 60 * 1000).toISOString;
 
   let scannedRows = 0;
   let deletedObjects = 0;

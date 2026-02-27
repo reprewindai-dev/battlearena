@@ -1,25 +1,25 @@
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { redirect } from "next/navigation";
+import { getSessionRole } from "@/lib/auth/session";
+import { ModerationConsole } from "@/components/admin/ModerationConsole";
+import { Shield } from "lucide-react";
 
-export default function ModerationConsolePage() {
+export default async function ModerationConsolePage() {
+  const role = await getSessionRole();
+  if (role !== "mod" && role !== "admin") redirect("/app");
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Moderation Console</h1>
+        <div className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-muted-foreground" />
+          <h1 className="text-2xl font-bold tracking-tight">Moderation Console</h1>
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Review queue + actions UI (skeleton).
+          Review and action all reported content. Cases are pulled live from the database.
         </p>
       </div>
 
-      <Card className="border-border/60 bg-card/40 p-5 backdrop-blur">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-medium">Queue</div>
-          <Badge variant="secondary">stub</Badge>
-        </div>
-        <div className="mt-2 text-sm text-muted-foreground">
-          This page will be backed by `moderation_cases` + `moderation_actions`.
-        </div>
-      </Card>
+      <ModerationConsole />
     </div>
   );
 }

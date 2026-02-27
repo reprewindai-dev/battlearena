@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser, getSessionRole } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -43,12 +42,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_status" }, { status: 400 });
   }
 
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock", battleId, status });
-  }
-
   const role = await getSessionRole();
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")

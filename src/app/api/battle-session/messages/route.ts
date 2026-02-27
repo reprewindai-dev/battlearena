@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -23,19 +22,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
   }
 
-  if (isMockAuthEnabled) {
-    const messages: ApiMessage[] = [
-      {
-        id: "m1",
-        author: "System",
-        body: "Battle session started (mock).",
-        ts: Date.now(),
-      },
-    ];
-    return NextResponse.json({ ok: true, mode: "mock", messages });
-  }
-
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: rows, error } = await supabase
     .from("battle_messages")
@@ -109,11 +99,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "missing_body" }, { status: 400 });
   }
 
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock" });
-  }
-
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

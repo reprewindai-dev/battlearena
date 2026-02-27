@@ -73,54 +73,154 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --sidebar: oklch(0.985 0.004 260);
-  --sidebar-foreground: oklch(0.2 0.02 260);
-  --sidebar-primary: oklch(0.26 0.03 270);
-  --sidebar-primary-foreground: oklch(0.99 0.004 260);
-  --sidebar-accent: oklch(0.96 0.01 260);
-  --sidebar-accent-foreground: oklch(0.23 0.02 260);
-  --sidebar-border: oklch(0.9 0.01 260);
-  --sidebar-ring: oklch(0.6 0.03 275);
-}
-
-.dark {
-  --background: oklch(0.12 0.02 260);
-  --foreground: oklch(0.98 0.004 260);
-  --card: oklch(0.16 0.02 260);
-  --card-foreground: oklch(0.98 0.004 260);
-  --popover: oklch(0.16 0.02 260);
-  --popover-foreground: oklch(0.98 0.004 260);
-  --primary: oklch(0.78 0.09 275);
-  --primary-foreground: oklch(0.16 0.02 260);
-  --secondary: oklch(0.2 0.02 260);
-  --secondary-foreground: oklch(0.98 0.004 260);
-  --muted: oklch(0.2 0.02 260);
-  --muted-foreground: oklch(0.72 0.02 260);
-  --accent: oklch(0.22 0.04 275);
-  --accent-foreground: oklch(0.98 0.004 260);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.98 0.004 260 / 10%);
-  --input: oklch(0.98 0.004 260 / 14%);
-  --ring: oklch(0.78 0.09 275);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.135 0.02 260);
-  --sidebar-foreground: oklch(0.98 0.004 260);
-  --sidebar-primary: oklch(0.78 0.09 275);
-  --sidebar-primary-foreground: oklch(0.16 0.02 260);
-  --sidebar-accent: oklch(0.2 0.02 260);
-  --sidebar-accent-foreground: oklch(0.98 0.004 260);
-  --sidebar-border: oklch(0.98 0.004 260 / 10%);
-  --sidebar-ring: oklch(0.78 0.09 275);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
+}
+
+/* Premium Component Styles */
+@layer components {
+  .arena-gradient-text {
+    @apply bg-gradient-to-r from-orange-400 via-pink-400 to-purple-400 bg-clip-text text-transparent;
+  }
+  
+  .arena-button-primary {
+    @apply bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1;
+  }
+  
+  .arena-button-secondary {
+    @apply bg-white/10 backdrop-blur-sm border border-white/20 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 hover:bg-white/20;
+  }
+  
+  .arena-card-premium {
+    @apply bg-gradient-to-br from-purple-900/20 to-orange-900/20 border border-white/10 backdrop-blur-sm rounded-2xl p-6 transition-all duration-300 hover:border-white/20 hover:shadow-xl;
+  }
+  
+  .arena-badge-live {
+    @apply bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse;
+  }
+  
+  .arena-input-premium {
+    @apply bg-white/10 border border-white/20 text-white placeholder-white/50 rounded-xl px-4 py-3 focus:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-400/20 transition-all duration-300;
+  }
+}
+
+/* Premium Utility Classes */
+@layer utilities {
+  .arena-glow-orange {
+    box-shadow: 0 0 20px rgba(251, 146, 60, 0.5);
+  }
+  
+  .arena-glow-purple {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+  }
+  
+  .arena-glow-pink {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.5);
+  }
+  
+  .arena-text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+  
+  .arena-backdrop-blur {
+    backdrop-filter: blur(20px);
+  }
+  
+  .arena-grid-pattern {
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
+  
+  .video-stable {
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  .video-no-flicker {
+    backface-visibility: hidden;
+    transform: translateZ(0);
+    will-change: transform;
+    opacity: 1;
+    visibility: visible;
+    mix-blend-mode: normal;
+    transition: none;
+  }
+}
+
+/* Global video anti-flicker styles - PRODUCTION READY */
+video {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+  object-fit: cover;
+  background-color: #000;
+}
+
+/* Prevent SSR hydration flicker */
+.video-container {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+}
+
+/* Critical anti-flicker for battle videos */
+.battle-video {
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  opacity: 1 !important;
+  visibility: visible !important;
+  mix-blend-mode: normal !important;
+  transition: none !important;
+  object-fit: cover !important;
+  background-color: #000 !important;
+}
+
+/* Force GPU layer creation */
+@supports (transform: translateZ(0)) {
+  video {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+  }
+}
+
+/* Prevent video element flicker during initialization */
+video::-webkit-media-controls-panel {
+  display: none !important;
+}
+
+video::-webkit-media-controls-play-button {
+  display: none !important;
+}
+
+/* Ensure stable rendering across browsers */
+@keyframes prevent-flicker {
+  0% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+.video-stable-render {
+  animation: prevent-flicker 0.1s linear;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
 }

@@ -5,87 +5,81 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FreestyleQueueCard } from "@/components/battle/FreestyleQueueCard";
 import { RankedQueueCard } from "@/components/battle/RankedQueueCard";
-import { isMockAuthEnabled, isSupabaseConfigured } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const metadata = { title: "Battle Lobby – Battle Arena" };
+
+async function getRecentBattles() {
+  "use server";
+  
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData.user?.id;
+  if (!uid) return [];
+
+  const { data } = await supabase
+    .from("battles")
+    .select("id,status,mode,created_at")
+    .eq("created_by", uid)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  return (data || []) as Array<{
+    id: string;
+    status: "draft" | "queued" | "live" | "complete" | "canceled";
+    mode: string;
+    created_at: string | null;
+  }>;
+}
+
 export default function BattleLobbyPage() {
-  async function getRecentBattles() {
-    if (!isSupabaseConfigured || isMockAuthEnabled) {
-      return [
-        { id: "mock_ionrunner_01", status: "live" as const, mode: "freestyle", created_at: null as string | null },
-        { id: "mock_glasscity_02", status: "queued" as const, mode: "freestyle", created_at: null as string | null },
-        { id: "mock_neondrift_03", status: "complete" as const, mode: "freestyle", created_at: null as string | null },
-      ];
-    }
-
-    const supabase = await createSupabaseServerClient();
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (!uid) return [];
-
-    const { data } = await supabase
-      .from("battles")
-      .select("id,status,mode,created_at")
-      .eq("created_by", uid)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    return (data ?? []) as Array<{
-      id: string;
-      status: "draft" | "queued" | "live" | "complete" | "canceled";
-      mode: string;
-      created_at: string | null;
-    }>;
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Battle Lobby</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Recent sessions + queues (incremental).
+            Join a queue or enter a battle room.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline">
             <Link href="/app/battles/history">History</Link>
           </Button>
+          <Button asChild variant="outline">
+            <Link href="/app/rooms">Browse Rooms</Link>
+          </Button>
           <Button asChild>
-            <Link href="/app/battles/room">Enter battle room</Link>
+            <Link href="/app/battles/pvp">PvP Battles</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/app/battles/room">Enter Battle Room</Link>
           </Button>
         </div>
       </div>
 
-      <RecentBattles getRecentBattles={getRecentBattles} />
+      <RecentBattles />
 
       <div className="grid gap-4 md:grid-cols-2">
         <FreestyleQueueCard />
-
         <RankedQueueCard />
       </div>
     </div>
   );
 }
 
-async function RecentBattles({
-  getRecentBattles,
-}: {
-  getRecentBattles: () => Promise<
-    Array<{ id: string; status: string; mode: string; created_at: string | null }>
-  >;
-}) {
+async function RecentBattles() {
   const battles = await getRecentBattles();
 
   return (
     <Card className="border-border/60 bg-card/40 p-5 backdrop-blur">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm font-medium">Recent sessions</div>
+          <div className="text-sm font-medium">Recent Sessions</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {isMockAuthEnabled || !isSupabaseConfigured
-              ? "Mock list (Supabase not configured)"
-              : "Your latest battles (created by you)"}
+            Your latest battles
           </div>
         </div>
         <Badge variant="secondary">live</Badge>
@@ -93,7 +87,7 @@ async function RecentBattles({
 
       <div className="mt-4 grid gap-3">
         {battles.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No sessions yet.</div>
+          <div className="text-sm text-muted-foreground">No sessions yet. Join a queue below to get started.</div>
         ) : (
           battles.map((b) => (
             <div

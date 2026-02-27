@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const schema = z.object({
@@ -31,17 +30,6 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  async function handleMockLogin() {
-    setError(null);
-    const res = await fetch("/api/mock-login", { method: "POST" });
-    if (!res.ok) {
-      setError("Mock login failed.");
-      return;
-    }
-    router.push(safeNextPath);
-    router.refresh();
-  }
 
   async function handleSupabaseLogin() {
     setError(null);
@@ -67,7 +55,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
       router.refresh();
     } catch {
       setError(
-        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY or use mock mode.",
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
   }
@@ -79,8 +67,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
         onSubmit={(e) => {
           e.preventDefault();
           startTransition(async () => {
-            if (isMockAuthEnabled) await handleMockLogin();
-            else await handleSupabaseLogin();
+            await handleSupabaseLogin();
           });
         }}
       >
@@ -108,7 +95,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
         {error ? <div className="text-sm text-destructive">{error}</div> : null}
 
         <Button type="submit" className="w-full" disabled={pending}>
-          {isMockAuthEnabled ? "Enter with mock session" : "Login"}
+          Login
         </Button>
 
         <div className="text-sm text-muted-foreground">

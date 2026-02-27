@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -52,31 +51,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
   }
 
-  if (isMockAuthEnabled) {
-    const mock: BattleSession = {
-      id: battleId,
-      status: "live",
-      mode: "freestyle",
-      created_by: user.id,
-      viewer_user_id: user.id,
-      started_at: null,
-      ended_at: null,
-      current_round: 1,
-      voting_opened_at: new Date().toISOString(),
-      voting_closes_at: new Date(Date.now() + 60_000).toISOString(),
-      result: null,
-      created_at: null,
-      can_manage: true,
-      viewer_role: "admin",
-      participants: [
-        { user_id: "mock-user-a", slot: 1, score: null, handle: "mocka", display_name: "Mock A" },
-        { user_id: "mock-user-b", slot: 2, score: null, handle: "mockb", display_name: "Mock B" },
-      ],
-    };
-    return NextResponse.json({ ok: true, mode: "mock", session: mock });
-  }
-
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: authData } = await supabase.auth.getUser();
   const role =
@@ -185,15 +163,10 @@ export async function POST() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  if (isMockAuthEnabled) {
-    return NextResponse.json({
-      ok: true,
-      mode: "mock",
-      battleId: `mock_${crypto.randomUUID()}`,
-    });
-  }
-
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

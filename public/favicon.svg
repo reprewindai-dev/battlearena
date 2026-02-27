@@ -1,0 +1,21 @@
+<!-- BattleArena Favicon -->
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="faviconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF6B9D;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Hexagon background -->
+  <polygon
+    points="16,2 28,9 28,23 16,30 4,23 4,9"
+    fill="url(#faviconGradient)"
+  />
+  
+  <!-- Swords cross -->
+  <g transform="translate(16, 16)">
+    <rect x="-1" y="-8" width="2" height="12" fill="white" />
+    <rect x="-1" y="-8" width="2" height="12" fill="white" transform="rotate(90)" />
+  </g>
+</svg>
