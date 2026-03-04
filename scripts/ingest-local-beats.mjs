@@ -131,7 +131,7 @@ async function uploadFile(filePath) {
 }
 
 async function insertBeat(meta) {
-  const { error } = await supabase.from("beats").insert({
+  const payload = {
     title: meta.title,
     artist: meta.producer,
     tempo: meta.tempo,
@@ -147,9 +147,18 @@ async function insertBeat(meta) {
     is_verified: true,
     is_active: true,
     status: "active",
-  });
+  };
+
+  const attemptInsert = async () => supabase.from("beats").insert(payload);
+
+  let { error } = await attemptInsert();
+
+  if (error && /uploaded_by/.test(error.message || "")) {
+    delete payload.uploaded_by;
+    ({ error } = await attemptInsert());
+  }
+
   if (error) {
-    // Ignore duplicate inserts if a unique constraint exists on file_url or title/artist in future
     if (error.code === "23505") return;
     throw error;
   }
