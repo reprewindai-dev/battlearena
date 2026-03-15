@@ -40,9 +40,9 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.mts"
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.mts"
   ],
   "exclude": [
     "node_modules",

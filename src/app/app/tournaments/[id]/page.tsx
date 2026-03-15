@@ -271,7 +271,7 @@ export default async function TournamentDetailPage({
                   {/* Avatar */}
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold uppercase">
                     {profile.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                       
                       <span className="sr-only">{profile.handle}</span>
                     ) : (
                       (profile.display_name ?? profile.handle)[0]
