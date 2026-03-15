@@ -19,49 +19,44 @@ export function FreestyleQueueCard() {
       const sessionUser = await getClientSessionUser();
       setUser(sessionUser);
     };
-    loadUser();
+    void loadUser();
   }, []);
 
   useEffect(() => {
-    if (isQueued && user) {
-      const interval = setInterval(async () => {
-        const status = await getStatus(user.id);
+    if (!isQueued || !user) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await getStatus(user.id, "freestyle");
         setQueueStatus(status);
-        
-        if (status?.status === 'matched') {
+
+        if (status.matched && status.battleId) {
           setIsQueued(false);
-          // Navigate to battle
-          window.location.href = `/app/battles/room/${status.battle_id}`;
+          window.location.href = `/app/battles/room?battleId=${encodeURIComponent(status.battleId)}`;
         }
-      }, 2000);
-      
-      return () => clearInterval(interval);
-    }
+      } catch (error) {
+        console.error("Failed to poll queue status:", error);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, [isQueued, user]);
 
   const handleJoinQueue = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
-      const result = await enqueue(user.id, 'freestyle');
-      console.log('Queue result:', result);
+      const result = await enqueue(user.id, "freestyle");
       setQueueStatus(result);
-      
-      if (result.status === 'matched') {
-        // Navigate to battle room
-        if (result.is_bot_match) {
-          window.location.href = `/app/battles/bot-room/${result.battle_id}`;
-        } else {
-          window.location.href = `/app/battles/room/${result.battle_id}`;
-        }
+
+      if (result.matched && result.battleId) {
+        window.location.href = `/app/battles/room?battleId=${encodeURIComponent(result.battleId)}`;
       } else {
         setIsQueued(true);
       }
     } catch (error: any) {
-      console.error('Failed to join queue:', error);
-      console.error('Error details:', error.message, error.code);
-      console.error('Full error:', JSON.stringify(error, null, 2));
+      console.error("Failed to join queue:", error);
     } finally {
       setLoading(false);
     }
@@ -69,20 +64,21 @@ export function FreestyleQueueCard() {
 
   const handleLeaveQueue = async () => {
     if (!user) return;
-    
+
     try {
       const matchmaking = getMatchmaking();
-      await matchmaking.dequeue(user.id);
+      await matchmaking.dequeue(user.id, "freestyle");
       setIsQueued(false);
       setQueueStatus(null);
     } catch (error: any) {
-      console.error('Failed to leave queue:', error);
-      console.error('Error details:', error.message, error.code);
+      console.error("Failed to leave queue:", error);
     }
   };
 
+  const queuedSeconds = Math.floor((queueStatus?.waitTimeMs ?? 0) / 1000);
+
   return (
-    <Card className="p-6">
+    <Card className="p-6" data-testid="freestyle-queue-card">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold">Freestyle Battles</h3>
@@ -106,8 +102,8 @@ export function FreestyleQueueCard() {
             <p className="text-gray-600">None</p>
           </div>
           <div>
-            <span className="font-medium">ELO:</span>
-            <p className="text-gray-600">Not affected</p>
+            <span className="font-medium">Bot fallback:</span>
+            <p className="text-gray-600">20s</p>
           </div>
         </div>
 
@@ -116,26 +112,15 @@ export function FreestyleQueueCard() {
             <div className="text-center">
               <div className="animate-pulse">
                 <p className="text-sm text-gray-600">Finding opponent...</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Queue time: {Math.floor((Date.now() - new Date(queueStatus?.created_at || Date.now()).getTime()) / 1000)}s
-                </p>
+                <p className="text-xs text-gray-500 mt-1">Queue time: {queuedSeconds}s</p>
               </div>
             </div>
-            <Button 
-              onClick={handleLeaveQueue}
-              variant="outline"
-              className="w-full"
-              disabled={loading}
-            >
+            <Button onClick={handleLeaveQueue} variant="outline" className="w-full" disabled={loading}>
               Leave Queue
             </Button>
           </div>
         ) : (
-          <Button 
-            onClick={handleJoinQueue}
-            className="w-full"
-            disabled={loading || !user}
-          >
+          <Button onClick={handleJoinQueue} className="w-full" disabled={loading || !user} data-testid="freestyle-queue-join">
             {loading ? "Joining..." : "Join Freestyle Queue"}
           </Button>
         )}

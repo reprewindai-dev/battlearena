@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 import { enqueue, getStatus } from "@/lib/matchmaking/client";
 import { getClientSessionUser } from "@/lib/auth/client-session";
+import { getMatchmaking } from "@/lib/matchmaking/client";
 
 export function RankedQueueCard() {
   const [isQueued, setIsQueued] = useState(false);
@@ -18,42 +19,44 @@ export function RankedQueueCard() {
       const sessionUser = await getClientSessionUser();
       setUser(sessionUser);
     };
-    loadUser();
+    void loadUser();
   }, []);
 
   useEffect(() => {
-    if (isQueued && user) {
-      const interval = setInterval(async () => {
-        const status = await getStatus(user.id, 'ranked');
+    if (!isQueued || !user) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await getStatus(user.id, "ranked");
         setQueueStatus(status);
-        
-        if (status?.status === 'matched') {
+
+        if (status.matched && status.battleId) {
           setIsQueued(false);
-          // Navigate to battle
-          window.location.href = `/app/battles/room/${status.battle_id}`;
+          window.location.href = `/app/battles/room?battleId=${encodeURIComponent(status.battleId)}`;
         }
-      }, 2000);
-      
-      return () => clearInterval(interval);
-    }
+      } catch (error) {
+        console.error("Failed to poll ranked queue status:", error);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, [isQueued, user]);
 
   const handleJoinQueue = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
-      const result = await enqueue(user.id, 'ranked');
+      const result = await enqueue(user.id, "ranked");
       setQueueStatus(result);
-      
-      if (result.status === 'matched') {
-        // Navigate directly to battle
-        window.location.href = `/app/battles/room/${result.battle_id}`;
+
+      if (result.matched && result.battleId) {
+        window.location.href = `/app/battles/room?battleId=${encodeURIComponent(result.battleId)}`;
       } else {
         setIsQueued(true);
       }
     } catch (error) {
-      console.error('Failed to join queue:', error);
+      console.error("Failed to join ranked queue:", error);
     } finally {
       setLoading(false);
     }
@@ -61,24 +64,29 @@ export function RankedQueueCard() {
 
   const handleLeaveQueue = async () => {
     if (!user) return;
-    
+
     try {
-      await enqueue(user.id, 'ranked'); // This will handle leaving
+      const matchmaking = getMatchmaking();
+      await matchmaking.dequeue(user.id, "ranked");
       setIsQueued(false);
       setQueueStatus(null);
     } catch (error) {
-      console.error('Failed to leave queue:', error);
+      console.error("Failed to leave ranked queue:", error);
     }
   };
 
+  const queuedSeconds = Math.floor((queueStatus?.waitTimeMs ?? 0) / 1000);
+
   return (
-    <Card className="p-6">
+    <Card className="p-6" data-testid="ranked-queue-card">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold">Ranked Battles</h3>
-          <p className="text-sm text-gray-600">Compete for ELO rating and prizes</p>
+          <p className="text-sm text-gray-600">Compete for ranking and rewards</p>
         </div>
-        <Badge variant="default" className="bg-red-500">RANKED</Badge>
+        <Badge variant="default" className="bg-red-500">
+          RANKED
+        </Badge>
       </div>
 
       <div className="space-y-4">
@@ -96,8 +104,8 @@ export function RankedQueueCard() {
             <p className="text-gray-600">$10.00</p>
           </div>
           <div>
-            <span className="font-medium">ELO:</span>
-            <p className="text-gray-600">Rating based</p>
+            <span className="font-medium">Bot fallback:</span>
+            <p className="text-gray-600">45s (MMR neutral)</p>
           </div>
         </div>
 
@@ -106,26 +114,15 @@ export function RankedQueueCard() {
             <div className="text-center">
               <div className="animate-pulse">
                 <p className="text-sm text-gray-600">Finding opponent...</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Queue time: {Math.floor((Date.now() - new Date(queueStatus?.created_at || Date.now()).getTime()) / 1000)}s
-                </p>
+                <p className="text-xs text-gray-500 mt-1">Queue time: {queuedSeconds}s</p>
               </div>
             </div>
-            <Button 
-              onClick={handleLeaveQueue}
-              variant="outline"
-              className="w-full"
-              disabled={loading}
-            >
+            <Button onClick={handleLeaveQueue} variant="outline" className="w-full" disabled={loading}>
               Leave Queue
             </Button>
           </div>
         ) : (
-          <Button 
-            onClick={handleJoinQueue}
-            className="w-full"
-            disabled={loading || !user}
-          >
+          <Button onClick={handleJoinQueue} className="w-full" disabled={loading || !user} data-testid="ranked-queue-join">
             {loading ? "Joining..." : "Join Ranked Queue"}
           </Button>
         )}

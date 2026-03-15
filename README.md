@@ -28,7 +28,7 @@ npm test
 Environment:
 
 - Copy `.env.example` to `.env` (repo root) or create `apps/web/.env.local`.
-- If `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` are not set, the web app uses cookie-based mock auth.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required for battle runtime, matchmaking, and live video flows. No mock-auth fallback is supported for production battle paths.
 
 ## Vision
 

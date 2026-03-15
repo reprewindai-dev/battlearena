@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
-import { getStatus } from "@/lib/matchmaking/production";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import {
+  normalizeQueueMode,
+  runMatchmakingStep,
+} from "@/lib/matchmaking/server";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -10,32 +14,31 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const mode = url.searchParams.get("mode") ?? "freestyle";
+  const queueType = normalizeQueueMode(url.searchParams.get("mode") ?? url.searchParams.get("queueType"));
+  const battleFormat = url.searchParams.get("battleFormat") ?? "60s";
 
   try {
-    const result = await getStatus(user.id, mode);
-    
-    if (!result) {
-      return NextResponse.json({ 
-        ok: true, 
-        mode: "supabase", 
-        status: "none", 
-        battleId: null 
-      });
-    }
+    const adminClient = createSupabaseServiceRoleClient();
 
-    return NextResponse.json({
-      ok: true,
-      mode: "supabase",
-      status: result.status,
-      battleId: result.battle_id,
-      data: result
+    const result = await runMatchmakingStep({
+      adminClient,
+      userId: user.id,
+      queueType,
+      battleFormat,
+      preferredGenres: [],
+      leave: false,
+      createIfMissing: false,
     });
+
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Matchmaking status error:', error);
-    return NextResponse.json({ 
-      error: "status_failed", 
-      details: error instanceof Error ? error.message : "Unknown error" 
-    }, { status: 400 });
+    console.error("Matchmaking status error:", error);
+    return NextResponse.json(
+      {
+        error: "status_failed",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 400 },
+    );
   }
 }

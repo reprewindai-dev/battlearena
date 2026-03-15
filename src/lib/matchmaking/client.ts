@@ -1,147 +1,84 @@
-import { createClient } from '@supabase/supabase-js';
-
 type QueueType = "freestyle" | "ranked" | "tournament";
 type BattleFormat = "30s" | "60s" | "90s" | "120s";
 
-interface QueueEntry {
-  id: string;
-  user_id: string;
-  queue_type: QueueType;
-  battle_format: BattleFormat;
-  status: string;
-  created_at: string;
-  expires_at: string;
-}
-
-interface Battle {
-  id: string;
-  created_by: string;
-  participant_1_id: string | null;
-  participant_2_id: string | null;
-  queue_type: QueueType;
-  battle_format: BattleFormat;
-  status: string;
-  started_at: string | null;
-  completed_at: string | null;
-  created_at: string;
+export interface MatchmakingResult {
+  ok: true;
+  mode: QueueType;
+  status: "queued" | "matched" | "none";
+  matched: boolean;
+  battleId: string | null;
+  isBotBattle: boolean;
+  fallbackReason: "none" | "timed_bot_fallback";
+  waitTimeMs: number;
+  queueType: QueueType;
 }
 
 export class ClientMatchmaking {
-  private supabase: any;
-
-  constructor() {
-    // Client-side initialization - use anon key for client operations
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      throw new Error('Supabase client configuration missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
-    }
-
-    this.supabase = createClient(supabaseUrl, supabaseAnonKey);
-  }
-
-  async enqueue(userId: string, queueType: QueueType, options: {
-    battleFormat?: BattleFormat;
-    preferredGenres?: string[];
-    beatId?: string;
-  } = {}) {
-    // First try to find a human opponent (quick timeout)
-    const humanResponse = await fetch('/api/matchmaking/enqueue', {
-      method: 'POST',
+  async enqueue(
+    _userId: string,
+    queueType: QueueType,
+    options: {
+      battleFormat?: BattleFormat;
+      preferredGenres?: string[];
+      leave?: boolean;
+      idempotencyKey?: string;
+    } = {},
+  ): Promise<MatchmakingResult> {
+    const idempotencyKey = options.idempotencyKey ?? (typeof crypto !== "undefined" ? crypto.randomUUID() : undefined);
+    const response = await fetch("/api/matchmaking/enqueue", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
+        ...(idempotencyKey ? { "x-idempotency-key": idempotencyKey } : {}),
       },
       body: JSON.stringify({
         queueType,
-        battleFormat: options.battleFormat || '60s',
-        preferredGenres: options.preferredGenres || [],
+        battleFormat: options.battleFormat ?? "60s",
+        preferredGenres: options.preferredGenres ?? [],
+        action: options.leave ? "leave" : undefined,
+        idempotencyKey,
       }),
     });
 
-    if (humanResponse.ok) {
-      const result = await humanResponse.json();
-      return result.entry;
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.details ?? payload?.error ?? "Failed to enqueue");
     }
 
-    // If no human found, create bot match
-    console.log('No human opponent found, creating bot match...');
-    const botResponse = await fetch('/api/matchmaking/bot-match', {
-      method: 'POST',
+    return payload as MatchmakingResult;
+  }
+
+  async dequeue(_userId: string, queueType: QueueType = "freestyle"): Promise<void> {
+    await this.enqueue(_userId, queueType, { leave: true });
+  }
+
+  async getStatus(_userId: string, queueType: QueueType = "freestyle"): Promise<MatchmakingResult> {
+    const query = new URLSearchParams({ mode: queueType });
+    const response = await fetch(`/api/matchmaking/status?${query.toString()}`, {
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        queueType,
-        battleFormat: options.battleFormat || '60s',
-        preferredGenres: options.preferredGenres || [],
-        beatId: options.beatId,
-      }),
     });
 
-    if (!botResponse.ok) {
-      const error = await botResponse.json();
-      console.error('Bot match API error:', error);
-      throw new Error(error.details || error.error || 'Failed to create bot match');
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.details ?? payload?.error ?? "Failed to fetch status");
     }
 
-    const result = await botResponse.json();
-    return {
-      ...result.battle,
-      status: 'matched',
-      battle_id: result.battle.id,
-      is_bot_match: true,
-    };
-  }
-
-  async dequeue(userId: string) {
-    const { error } = await this.supabase
-      .from('matchmaking_queue')
-      .delete()
-      .eq('user_id', userId);
-
-    if (error) {
-      console.error('Dequeue error:', error);
-      throw error;
-    }
-  }
-
-  async getStatus(userId: string) {
-    const { data, error } = await this.supabase
-      .from('matchmaking_queue')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
-  }
-
-  async findMatch(userId: string) {
-    // Call the database function to find matches
-    const { data, error } = await this.supabase
-      .rpc('find_match', { 
-        p_user_id: userId, 
-        p_queue_type: 'freestyle' 
-      });
-
-    if (error) throw error;
-    return data;
+    return payload as MatchmakingResult;
   }
 
   async getBattle(battleId: string) {
-    const { data, error } = await this.supabase
-      .from('battles')
-      .select('*')
-      .eq('id', battleId)
-      .single();
-
-    if (error) throw error;
-    return data;
+    const res = await fetch(`/api/battles/${encodeURIComponent(battleId)}`);
+    const body = await res.json();
+    if (!res.ok) {
+      throw new Error(body?.details ?? body?.error ?? "Failed to load battle");
+    }
+    return body?.battle ?? null;
   }
 }
 
-// Singleton instance
 let matchmakingInstance: ClientMatchmaking | null = null;
 
 export function getMatchmaking() {
@@ -151,12 +88,16 @@ export function getMatchmaking() {
   return matchmakingInstance;
 }
 
-export const enqueue = async (userId: string, queueType: QueueType, options?: any) => {
+export const enqueue = async (
+  userId: string,
+  queueType: QueueType,
+  options?: { battleFormat?: BattleFormat; preferredGenres?: string[]; leave?: boolean; idempotencyKey?: string },
+) => {
   const matchmaking = getMatchmaking();
   return matchmaking.enqueue(userId, queueType, options);
 };
 
-export const getStatus = async (userId: string) => {
+export const getStatus = async (userId: string, queueType: QueueType = "freestyle") => {
   const matchmaking = getMatchmaking();
-  return matchmaking.getStatus(userId);
+  return matchmaking.getStatus(userId, queueType);
 };

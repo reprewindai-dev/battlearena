@@ -1176,8 +1176,10 @@ export function BattleRoomCockpit() {
       </Card>
 
       {/* Video Battle UI */}
-      {sessionId ? (
+      {sessionId && sessionMeta?.viewer_user_id ? (
         <VideoBattleProduction
+          battleId={sessionId}
+          viewerUserId={sessionMeta.viewer_user_id}
           localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
           onStreamReady={(stream) => {
             // Optional: handle stream ready for recording/broadcast

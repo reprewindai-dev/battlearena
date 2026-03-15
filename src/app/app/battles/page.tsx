@@ -52,7 +52,7 @@ export default function BattleLobbyPage() {
             <Link href="/app/rooms">Browse Rooms</Link>
           </Button>
           <Button asChild>
-            <Link href="/app/battles/pvp">PvP Battles</Link>
+            <Link href="/app/battles/room">Live Battles</Link>
           </Button>
           <Button asChild>
             <Link href="/app/battles/room">Enter Battle Room</Link>

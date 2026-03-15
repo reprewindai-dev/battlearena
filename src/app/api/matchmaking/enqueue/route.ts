@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-async function getServiceClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceKey) {
-    throw new Error("supabase_service_config_missing");
-  }
-
-  return createClient(supabaseUrl, serviceKey, {
-    auth: {
-      persistSession: false,
-    },
-  });
-}
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import {
+  ensurePublicUser,
+  normalizeQueueMode,
+  readIdempotentMatchmakingResult,
+  runMatchmakingStep,
+  writeIdempotentMatchmakingResult,
+} from "@/lib/matchmaking/server";
 
 export async function POST(request: Request) {
   try {
@@ -34,53 +26,71 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => ({}));
-    const queueType = body.queueType ?? "freestyle";
-    const battleFormat = body.battleFormat ?? "60s";
-    const preferredGenres: string[] = Array.isArray(body.preferredGenres) ? body.preferredGenres : [];
+    const body: Record<string, unknown> = await request
+      .json()
+      .catch(() => ({} as Record<string, unknown>));
+    const queueType = normalizeQueueMode(body.queueType);
+    const battleFormat = typeof body.battleFormat === "string" ? body.battleFormat : "60s";
+    const preferredGenres = Array.isArray(body.preferredGenres)
+      ? body.preferredGenres.filter((v): v is string => typeof v === "string")
+      : [];
+    const leave = body.action === "leave" || body.leave === true;
+    const idempotencyKeyFromBody =
+      typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
+    const idempotencyKeyFromHeader = request.headers.get("x-idempotency-key")?.trim() ?? "";
+    const idempotencyKey = idempotencyKeyFromHeader || idempotencyKeyFromBody;
 
-    const adminClient = await getServiceClient();
+    const adminClient = createSupabaseServiceRoleClient();
+    const scope = `matchmaking:enqueue:${queueType}`;
 
-    // Ensure public.users record exists
     const username =
-      body.username ?? user.user_metadata?.username ?? user.email?.split("@")[0] ?? `user_${user.id.slice(0, 8)}`;
+      (typeof body.username === "string" && body.username) ||
+      user.user_metadata?.username ||
+      user.email?.split("@")[0];
 
-    const { error: upsertError } = await adminClient
-      .from("users")
-      .upsert(
-        {
-          id: user.id,
-          email: user.email ?? `${username}@battlearena.com`,
-          username,
-        },
-        { onConflict: "id" }
-      );
+    await ensurePublicUser(adminClient, user, username);
 
-    if (upsertError) {
-      return NextResponse.json({ error: "user_upsert_failed", details: upsertError.message }, { status: 500 });
+    if (idempotencyKey) {
+      const existing = await readIdempotentMatchmakingResult({
+        adminClient,
+        userId: user.id,
+        key: idempotencyKey,
+        scope,
+      });
+      if (existing) {
+        return NextResponse.json(existing.response, { status: existing.statusCode });
+      }
     }
 
-    // Remove any stale queue entries for this user
-    await adminClient.from("matchmaking_queue").delete().eq("user_id", user.id);
+    const result = await runMatchmakingStep({
+      adminClient,
+      userId: user.id,
+      queueType,
+      battleFormat,
+      preferredGenres,
+      leave,
+      idempotencyKey: idempotencyKey || undefined,
+    });
 
-    const { data: queueEntry, error: queueError } = await adminClient
-      .from("matchmaking_queue")
-      .insert({
-        user_id: user.id,
-        queue_type: queueType,
-        battle_format: battleFormat,
-        preferred_genres: preferredGenres,
-        status: "active",
-      })
-      .select("id,battle_format,status,queue_type,user_id")
-      .single();
-
-    if (queueError) {
-      return NextResponse.json({ error: "enqueue_failed", details: queueError.message }, { status: 400 });
+    if (idempotencyKey) {
+      await writeIdempotentMatchmakingResult({
+        adminClient,
+        userId: user.id,
+        key: idempotencyKey,
+        scope,
+        statusCode: 200,
+        response: result,
+      });
     }
 
-    return NextResponse.json({ ok: true, entry: queueEntry });
-  } catch (error: any) {
-    return NextResponse.json({ error: "unknown_error", details: error.message ?? "" }, { status: 500 });
+    return NextResponse.json(result);
+  } catch (error: unknown) {
+    return NextResponse.json(
+      {
+        error: "matchmaking_enqueue_failed",
+        details: error instanceof Error ? error.message : "unknown_error",
+      },
+      { status: 500 },
+    );
   }
 }

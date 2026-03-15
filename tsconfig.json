@@ -42,15 +42,15 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    ".next/dev/dev/types/**/*.ts"
+    "**/*.mts"
   ],
   "exclude": [
     "node_modules",
     "arena-web",
     "apps",
+    ".next/dev",
+    "battlearena",
+    "windsurf-project-3",
     "package.monorepo.json",
     "package-lock.monorepo.json"
   ]
