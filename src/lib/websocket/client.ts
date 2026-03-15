@@ -119,12 +119,13 @@ export class BattleWebSocketClient {
   }
 
   sendMessage(message: string, type: ChatMessage['type'] = 'message') {
-    if (!this.config || !this.isConnected()) {
+    const config = this.config;
+    if (!config || !this.isConnected()) {
       // Queue message for later
       this.messageQueue.push({
         id: this.generateMessageId(),
-        userId: this.config.userId,
-        username: this.config.userId, // Will be updated by server
+        userId: config?.userId ?? "unknown",
+        username: config?.userId ?? "unknown", // Will be updated by server
         message,
         timestamp: Date.now(),
         type
@@ -134,8 +135,8 @@ export class BattleWebSocketClient {
 
     const chatMessage: ChatMessage = {
       id: this.generateMessageId(),
-      userId: this.config.userId,
-      username: this.config.userId,
+      userId: config.userId,
+      username: config.userId,
       message,
       timestamp: Date.now(),
       type
@@ -168,7 +169,7 @@ export class BattleWebSocketClient {
     }));
   }
 
-  private handleMessage(data: any) {
+  private handleMessage(data: { type?: string; data?: unknown }) {
     const { type, data: messageData } = data;
 
     switch (type) {
@@ -177,15 +178,23 @@ export class BattleWebSocketClient {
         break;
       
       case 'typing':
-        this.onTyping?.(messageData.users || []);
+        this.onTyping?.(
+          messageData && typeof messageData === "object" && "users" in messageData
+            ? (((messageData as { users?: unknown }).users as string[]) ?? [])
+            : [],
+        );
         break;
       
       case 'user_joined':
-        this.onUserJoined?.(messageData);
+        if (messageData && typeof messageData === "object" && "id" in messageData && "username" in messageData) {
+          this.onUserJoined?.(messageData as { id: string; username: string });
+        }
         break;
       
       case 'user_left':
-        this.onUserLeft?.(messageData.userId);
+        if (messageData && typeof messageData === "object" && "userId" in messageData) {
+          this.onUserLeft?.(String((messageData as { userId?: unknown }).userId ?? ""));
+        }
         break;
       
       case 'pong':

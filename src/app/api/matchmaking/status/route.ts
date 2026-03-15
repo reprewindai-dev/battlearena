@@ -6,6 +6,7 @@ import {
   normalizeQueueMode,
   runMatchmakingStep,
 } from "@/lib/matchmaking/server";
+import { runTestModeMatchmaking } from "@/lib/matchmaking/test-mode";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -16,8 +17,18 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const queueType = normalizeQueueMode(url.searchParams.get("mode") ?? url.searchParams.get("queueType"));
   const battleFormat = url.searchParams.get("battleFormat") ?? "60s";
+  const testMode = process.env.ARENA_FORCE_MOCK_AUTH === "1";
 
   try {
+    if (testMode) {
+      const result = runTestModeMatchmaking({
+        userId: user.id,
+        queueType,
+        leave: false,
+      });
+      return NextResponse.json(result);
+    }
+
     const adminClient = createSupabaseServiceRoleClient();
 
     const result = await runMatchmakingStep({

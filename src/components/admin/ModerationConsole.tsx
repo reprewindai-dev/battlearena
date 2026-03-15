@@ -203,7 +203,7 @@ function CaseDetailModal({
                     <div key={a.id} className="flex items-start justify-between gap-2 rounded border border-border/40 bg-muted/10 px-3 py-2 text-xs">
                       <div>
                         <span className="font-medium">{ACTION_LABELS[a.action_type] ?? a.action_type}</span>
-                        {a.payload?.note && <span className="ml-2 text-muted-foreground">— {a.payload.note as string}</span>}
+                        {typeof a.payload?.note === "string" ? (<span className="ml-2 text-muted-foreground">- {a.payload.note}</span>) : null}
                       </div>
                       <span className="shrink-0 text-muted-foreground">{formatDistanceToNow(a.created_at)}</span>
                     </div>
@@ -383,3 +383,5 @@ export function ModerationConsole() {
     </div>
   );
 }
+
+

@@ -57,10 +57,14 @@ export function BattleHistory({ userId }: { userId?: string }) {
       query = query.eq("status", statusFilter);
     }
 
-    query.then(({ data, error }: { data: Battle[] | null; error: unknown }) => {
-      if (!error) setBattles(data ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    void (async () => {
+      try {
+        const { data, error } = await query;
+        if (!error) setBattles((data ?? []) as Battle[]);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [userId, statusFilter]);
 
   return (

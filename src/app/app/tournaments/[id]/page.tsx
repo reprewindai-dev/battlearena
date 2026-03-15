@@ -22,7 +22,7 @@ type Participant = {
     avatar_url: string | null;
     elo_rating: number;
     tier: string;
-  } | null;
+  }[] | null;
 };
 
 type Tournament = {
@@ -131,7 +131,10 @@ export default async function TournamentDetailPage({
   const user = await getSessionUser();
   const isRegistered = user
     ? (participants ?? []).some(
-        (p: Participant) => p.user_profiles?.id === user.id
+        (p: Participant) => {
+          const profile = Array.isArray(p.user_profiles) ? p.user_profiles[0] : null;
+          return profile?.id === user.id;
+        }
       )
     : false;
 
@@ -253,7 +256,7 @@ export default async function TournamentDetailPage({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {confirmedParticipants.map((p: Participant, idx: number) => {
-              const profile = p.user_profiles;
+              const profile = Array.isArray(p.user_profiles) ? p.user_profiles[0] : null;
               if (!profile) return null;
               return (
                 <Link

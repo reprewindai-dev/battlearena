@@ -25,6 +25,8 @@ export interface MatchRecording {
   bot_personality_id?: string;
   governance_tier?: string;
   opponent_plan_id?: string;
+  event_stream_hash?: string;
+  server_signature?: string;
 }
 
 export interface GhostPattern {
@@ -72,7 +74,6 @@ export class GhostRecordingSystem {
 
     // Record MATCH_START event
     await this.recordEvent(match_id, {
-      seq: 0,
       t_ms: 0,
       actor: 'server',
       event_type: 'MATCH_START',
@@ -324,7 +325,7 @@ export class GhostRecordingSystem {
 
     const ghostPattern: GhostPattern = {
       player_id,
-      recording_match_id: events[0].payload.match_id,
+      recording_match_id: String(events[0]?.payload?.match_id ?? ''),
       player_mmr_at_time: player_mmr,
       skill_band,
       playstyle_tags,
@@ -504,14 +505,14 @@ export class GhostRecordingSystem {
 
       // Calculate similarity scores
       const ghosts = data || [];
-      const scoredGhosts = ghosts.map(ghost => ({
+      const scoredGhosts = ghosts.map((ghost: any) => ({
         ...ghost,
         similarity_score: this.calculateSimilarity(playerMMR, ghost)
       }));
 
       // Sort by similarity and return top matches
       return scoredGhosts
-        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .sort((a: any, b: any) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
 
     } catch (error) {

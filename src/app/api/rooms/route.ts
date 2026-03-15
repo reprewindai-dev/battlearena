@@ -135,6 +135,7 @@ export async function POST(request: Request) {
 async function generateRoomCode(client: any): Promise<string> {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   let code: string;
+  let exists = true;
   let attempts = 0;
   
   do {
@@ -148,10 +149,11 @@ async function generateRoomCode(client: any): Promise<string> {
       .select("room_code")
       .eq("room_code", code)
       .single();
+    exists = Boolean(data);
     
     attempts++;
     if (attempts > 10) break;
-  } while (data);
+  } while (exists);
   
   return code;
 }

@@ -1,7 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
-export const BattleArenaLogo = ({ size = "medium", className = "" }) => {
+type LogoSize = "small" | "medium" | "large" | "xl";
+
+export const BattleArenaLogo = ({ size = "medium", className = "" }: { size?: LogoSize; className?: string }) => {
   const sizeClasses = {
     small: "w-8 h-8",
     medium: "w-12 h-12", 
@@ -68,7 +70,7 @@ export const BattleArenaLogo = ({ size = "medium", className = "" }) => {
   );
 };
 
-export const BattleArenaWordmark = ({ size = "medium", className = "" }) => {
+export const BattleArenaWordmark = ({ size = "medium", className = "" }: { size?: LogoSize; className?: string }) => {
   const sizeClasses = {
     small: "text-lg",
     medium: "text-2xl",

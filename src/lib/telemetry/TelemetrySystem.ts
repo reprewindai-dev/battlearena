@@ -21,6 +21,7 @@ export interface TelemetryMetrics {
   fairness_violation_rate: number;
   total_matches: number;
   total_queue_enters: number;
+  timestamp?: number;
 }
 
 export class TelemetrySystem {
@@ -236,7 +237,9 @@ export class TelemetrySystem {
         return { p50: 0, p90: 0, p95: 0, p99: 0 };
       }
 
-      const ttfmValues = data.map(d => d.event_data.ttfm_ms).sort((a, b) => a - b);
+      const ttfmValues = data
+        .map((d: { event_data: { ttfm_ms?: number } }) => d.event_data.ttfm_ms ?? 0)
+        .sort((a: number, b: number) => a - b);
       
       if (ttfmValues.length === 0) {
         return { p50: 0, p90: 0, p95: 0, p99: 0 };
@@ -332,7 +335,7 @@ export class TelemetrySystem {
     // Check cache first
     if (this.metricsCache.has(cacheKey)) {
       const cached = this.metricsCache.get(cacheKey)!;
-      if (Date.now() - cached.timestamp < 30000) { // 30 second cache
+      if (typeof cached.timestamp === "number" && Date.now() - cached.timestamp < 30000) { // 30 second cache
         return cached;
       }
     }

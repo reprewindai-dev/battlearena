@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import {
   ensurePublicUser,
@@ -9,20 +9,12 @@ import {
   runMatchmakingStep,
   writeIdempotentMatchmakingResult,
 } from "@/lib/matchmaking/server";
+import { runTestModeMatchmaking } from "@/lib/matchmaking/test-mode";
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) {
-      return NextResponse.json({ error: "supabase_not_configured" }, { status: 500 });
-    }
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
     }
 
@@ -39,13 +31,22 @@ export async function POST(request: Request) {
       typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
     const idempotencyKeyFromHeader = request.headers.get("x-idempotency-key")?.trim() ?? "";
     const idempotencyKey = idempotencyKeyFromHeader || idempotencyKeyFromBody;
+    const testMode = process.env.ARENA_FORCE_MOCK_AUTH === "1";
+
+    if (testMode) {
+      const result = runTestModeMatchmaking({
+        userId: user.id,
+        queueType,
+        leave,
+      });
+      return NextResponse.json(result);
+    }
 
     const adminClient = createSupabaseServiceRoleClient();
     const scope = `matchmaking:enqueue:${queueType}`;
 
     const username =
       (typeof body.username === "string" && body.username) ||
-      user.user_metadata?.username ||
       user.email?.split("@")[0];
 
     await ensurePublicUser(adminClient, user, username);

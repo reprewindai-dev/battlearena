@@ -19,9 +19,10 @@ async function getServiceClient() {
 
 export async function GET(
   request: Request,
-  { params }: { params: { battleId: string } }
+  { params }: { params: Promise<{ battleId: string }> }
 ) {
   try {
+    const { battleId } = await params;
     const supabase = await createSupabaseServerClient();
     if (!supabase) {
       return NextResponse.json({ error: "supabase_not_configured" }, { status: 500 });
@@ -47,7 +48,7 @@ export async function GET(
         participant_1:users!battles_participant_1_id_fkey(*),
         participant_2:users!battles_participant_2_id_fkey(*)
       `)
-      .eq("id", params.battleId)
+      .eq("id", battleId)
       .single();
 
     if (battleError || !battle) {
@@ -65,11 +66,9 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: { battleId: string } }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ battleId: string }> }) {
   try {
+    const { battleId } = await params;
     const supabase = await createSupabaseServerClient();
     if (!supabase) {
       return NextResponse.json({ error: "supabase_not_configured" }, { status: 500 });
@@ -99,7 +98,7 @@ export async function POST(
         participant_2_score: scores.botScore,
         completed_at: new Date().toISOString(),
       })
-      .eq("id", params.battleId)
+      .eq("id", battleId)
       .select("*")
       .single();
 

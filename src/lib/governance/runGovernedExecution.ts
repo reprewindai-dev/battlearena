@@ -37,7 +37,7 @@ export async function runGovernedExecution(context: GovernanceContext): Promise<
     const coherenceCheck = await vcttCoherence(normalizedContext);
     
     // Step 6: Watchtower validation
-    const watchtowerValidation = await watchtowerValidation(normalizedContext);
+    const watchtowerCheck = await watchtowerValidation(normalizedContext);
     
     // Step 7: Community memory similarity check
     const similarityCheck = await communityMemoryCheck(normalizedContext);
@@ -51,7 +51,7 @@ export async function runGovernedExecution(context: GovernanceContext): Promise<
       routingDecision,
       schemaValidation,
       coherenceCheck,
-      watchtowerValidation,
+      watchtowerValidation: watchtowerCheck,
       similarityCheck,
       fairnessEvaluation
     });
@@ -74,7 +74,7 @@ export async function runGovernedExecution(context: GovernanceContext): Promise<
         routing: routingDecision,
         schema: schemaValidation,
         coherence: coherenceCheck,
-        watchtower: watchtowerValidation,
+        watchtower: watchtowerCheck,
         similarity: similarityCheck,
         fairness: fairnessEvaluation,
         tier: tierAssignment

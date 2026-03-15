@@ -31,7 +31,7 @@ export interface DramaCurve {
   aggressiveness: number;
 }
 
-export interface HumanizationFilters {
+export interface HumanizationFilterSet {
   timingRealism: {
     reactionDelay: number;
     hesitationSpikes: number[];
@@ -401,7 +401,7 @@ class TelemetryEngine {
     }
 
     // Calculate churn risk
-    const recentLosses = recentSessions.filter(s => s.result === 'loss').length;
+    const recentLosses = recentSessions.filter((s: { result: 'win' | 'loss' }) => s.result === 'loss').length;
     data.churnRisk = recentLosses / recentSessions.length;
   }
 
