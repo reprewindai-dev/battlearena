@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 
@@ -67,10 +67,15 @@ function formatMMSS(totalSeconds: number) {
   return `${mm}:${ss}`;
 }
 
-type Beat = { id: string; title: string; bpm: number; lengthSeconds: number };
-
-// TODO: Replace with real beat library integration
-// This should fetch from a real beat library API or database
+type Beat = {
+  id: string;
+  title: string;
+  artist: string;
+  tempo: number;
+  genre: string;
+  duration_seconds: number | null;
+  preview_url: string | null;
+};
 type MicStatus = "idle" | "requesting" | "granted" | "denied" | "unsupported" | "error";
 
 type ChatMessage = { id: string; author: string; body: string; ts: number };
@@ -364,14 +369,14 @@ export function BattleRoomCockpit() {
   const battleStatus = sessionMeta?.status ?? "--";
   const statusBadge =
     battleStatus === "live"
-      ? { label: `LIVE (${sessionMode ?? "…"})`, className: "bg-emerald-500/15 text-emerald-200" }
+      ? { label: `LIVE (${sessionMode ?? "â€¦"})`, className: "bg-emerald-500/15 text-emerald-200" }
       : battleStatus === "queued" || battleStatus === "draft"
-        ? { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "…"})`, className: "bg-amber-500/15 text-amber-200" }
+        ? { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "â€¦"})`, className: "bg-amber-500/15 text-amber-200" }
         : battleStatus === "complete"
-          ? { label: `COMPLETE (${sessionMode ?? "…"})`, className: "bg-slate-500/20 text-slate-200" }
+          ? { label: `COMPLETE (${sessionMode ?? "â€¦"})`, className: "bg-slate-500/20 text-slate-200" }
           : battleStatus === "canceled"
-            ? { label: `CANCELED (${sessionMode ?? "…"})`, className: "bg-slate-500/20 text-slate-200" }
-            : { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "…"})`, className: "bg-slate-500/20 text-slate-200" };
+            ? { label: `CANCELED (${sessionMode ?? "â€¦"})`, className: "bg-slate-500/20 text-slate-200" }
+            : { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "â€¦"})`, className: "bg-slate-500/20 text-slate-200" };
 
   function leaveBattle() {
     clearStoredSession();
@@ -408,6 +413,61 @@ export function BattleRoomCockpit() {
   const [beatModalOpen, setBeatModalOpen] = React.useState(false);
   const [currentBeat, setCurrentBeat] = React.useState<Beat | null>(null);
   const [beatPlaying, setBeatPlaying] = React.useState(false);
+  const [beatLibrary, setBeatLibrary] = React.useState<Beat[]>([]);
+  const [beatSearch, setBeatSearch] = React.useState("");
+  const [beatsLoading, setBeatsLoading] = React.useState(false);
+  const [beatLoadError, setBeatLoadError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!beatModalOpen) return;
+
+    let cancelled = false;
+
+    async function loadBeatLibrary() {
+      setBeatsLoading(true);
+      setBeatLoadError(null);
+
+      try {
+        const res = await fetch("/api/beats?limit=40&sort_by=usage_count&sort_order=desc");
+        const body = (await res.json()) as
+          | { ok: true; beats: Beat[] }
+          | { error: string; details?: string };
+
+        if (cancelled) return;
+        if (!res.ok || !("ok" in body)) {
+          const details = "details" in body && typeof body.details === "string" ? body.details : null;
+          setBeatLoadError(details ? `Unable to load beats: ${details}` : "Unable to load beats.");
+          return;
+        }
+
+        setBeatLibrary(body.beats);
+      } catch {
+        if (cancelled) return;
+        setBeatLoadError("Unable to load beats.");
+      } finally {
+        if (!cancelled) {
+          setBeatsLoading(false);
+        }
+      }
+    }
+
+    void loadBeatLibrary();
+    return () => {
+      cancelled = true;
+    };
+  }, [beatModalOpen]);
+
+  const visibleBeats = React.useMemo(() => {
+    const needle = beatSearch.trim().toLowerCase();
+    if (!needle) return beatLibrary;
+    return beatLibrary.filter((beat) => {
+      return (
+        beat.title.toLowerCase().includes(needle) ||
+        beat.artist.toLowerCase().includes(needle) ||
+        beat.genre.toLowerCase().includes(needle)
+      );
+    });
+  }, [beatLibrary, beatSearch]);
 
   const [micStatus, setMicStatus] = React.useState<MicStatus>("idle");
   const [isClient, setIsClient] = React.useState(false);
@@ -1078,9 +1138,9 @@ export function BattleRoomCockpit() {
         <div className="text-right text-xs text-muted-foreground">
           {isSupabaseMode ? (
             <>
-              <div>Online: {onlineCount ?? "…"}</div>
+              <div>Online: {onlineCount ?? "â€¦"}</div>
               <div>
-                Typing: {typingUserIds.length > 0 ? `${typingUserIds.length}` : "—"}
+                Typing: {typingUserIds.length > 0 ? `${typingUserIds.length}` : "â€”"}
               </div>
             </>
           ) : (
@@ -1140,7 +1200,7 @@ export function BattleRoomCockpit() {
                       onClick={() => updateBattleStatus("live")}
                       disabled={isUpdatingStatus}
                     >
-                      {isUpdatingStatus ? "Updating…" : "Start"}
+                      {isUpdatingStatus ? "Updatingâ€¦" : "Start"}
                     </Button>
                   ) : (
                     <Button
@@ -1149,7 +1209,7 @@ export function BattleRoomCockpit() {
                       onClick={() => void finalizeBattle()}
                       disabled={isFinalizing || votingClosed}
                     >
-                      {isFinalizing ? "Finalizing…" : "Finalize"}
+                      {isFinalizing ? "Finalizingâ€¦" : "Finalize"}
                     </Button>
                   )}
                 </>
@@ -1158,7 +1218,7 @@ export function BattleRoomCockpit() {
 
             {showJoinAsB ? (
               <Button size="sm" variant="secondary" onClick={joinAsB} disabled={isJoining}>
-                {isJoining ? "Joining…" : "Join as B"}
+                {isJoining ? "Joiningâ€¦" : "Join as B"}
               </Button>
             ) : null}
 
@@ -1236,7 +1296,7 @@ export function BattleRoomCockpit() {
                 <div className="text-sm font-medium">Beat</div>
                 <div className="mt-1 text-xs text-muted-foreground">
                   {currentBeat
-                    ? `${currentBeat.title} · ${currentBeat.bpm} BPM · ${currentBeat.lengthSeconds}s`
+                    ? `${currentBeat.title} · ${currentBeat.tempo} BPM${typeof currentBeat.duration_seconds === "number" ? ` · ${currentBeat.duration_seconds}s` : ""}`
                     : "No beat library available"}
                 </div>
               </div>
@@ -1269,13 +1329,13 @@ export function BattleRoomCockpit() {
               <div>
                 <div className="text-sm font-medium">Recording</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Status: <span className="text-foreground">{recordingState}</span> · Duration:{" "}
+                  Status: <span className="text-foreground">{recordingState}</span> Â· Duration:{" "}
                   <span className="font-mono text-foreground">
                     {formatMMSS(recordingSeconds)}
                   </span>
                   {isSupabaseMode ? (
                     <>
-                      {" "}· Persisted{" "}
+                      {" "}Â· Persisted{" "}
                       <span className="font-mono text-foreground">
                         {recordingsCount ?? "--"}
                       </span>
@@ -1306,7 +1366,7 @@ export function BattleRoomCockpit() {
                     onClick={enableMic}
                     disabled={micStatus === "requesting" || micStatus === "unsupported"}
                   >
-                    {micStatus === "requesting" ? "Requesting…" : "Enable Mic"}
+                    {micStatus === "requesting" ? "Requestingâ€¦" : "Enable Mic"}
                   </Button>
                 ) : isClient && micStatus === "granted" ? (
                   <Badge className="bg-cyan-500/15 text-cyan-200">Mic ready</Badge>
@@ -1343,7 +1403,7 @@ export function BattleRoomCockpit() {
                     onClick={() => void playLatestPersisted()}
                     disabled={!latestRecordingId || isPlayingPersisted}
                   >
-                    {isPlayingPersisted ? "Loading…" : "Play Persisted"}
+                    {isPlayingPersisted ? "Loadingâ€¦" : "Play Persisted"}
                   </Button>
                 ) : null}
                 <Button
@@ -1358,7 +1418,7 @@ export function BattleRoomCockpit() {
                   {isClient && (
                     <>
                       {isSupabaseMode && isUploadingRecording
-                        ? "Uploading…"
+                        ? "Uploadingâ€¦"
                         : micStatus === "unsupported"
                           ? "Unsupported"
                           : "MediaRecorder"}
@@ -1440,7 +1500,7 @@ export function BattleRoomCockpit() {
                               onClick={() => void deletePersistedRecording(r.id)}
                               disabled={deletingRecordingId === r.id || isPlayingPersisted}
                             >
-                              {deletingRecordingId === r.id ? "Deleting…" : "Delete"}
+                              {deletingRecordingId === r.id ? "Deletingâ€¦" : "Delete"}
                             </Button>
                           ) : null}
                         </div>
@@ -1492,7 +1552,7 @@ export function BattleRoomCockpit() {
                 <Textarea
                   value={chatDraft}
                   onChange={(e) => setChatDraft(e.target.value)}
-                  placeholder="Say something…"
+                  placeholder="Say somethingâ€¦"
                   className="min-h-[44px]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -1527,7 +1587,7 @@ export function BattleRoomCockpit() {
                         <div className="mt-1 text-xs text-muted-foreground">
                           Voting {votingClosed ? "closed" : "open"}
                           {remainingSeconds !== null && !votingClosed
-                            ? ` · closes in ${remainingSeconds}s`
+                            ? ` Â· closes in ${remainingSeconds}s`
                             : ""}
                         </div>
                       ) : null}
@@ -1602,21 +1662,47 @@ export function BattleRoomCockpit() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Choose a beat</DialogTitle>
-            <DialogDescription>
-              Beat library integration needed - no beats available yet.
-            </DialogDescription>
+            <DialogDescription>Select an active beat from the live library.</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-2">
-            <div className="p-4 rounded-lg border border-border/60 bg-background/30">
-              <p className="text-muted-foreground text-sm">
-                No beats available. Beat library integration is required for production.
-              </p>
+            <Input
+              value={beatSearch}
+              onChange={(e) => setBeatSearch(e.target.value)}
+              placeholder="Search title, artist, or genre"
+            />
+            <div className="max-h-64 overflow-auto rounded-lg border border-border/60 bg-background/30 p-2">
+              {beatsLoading ? (
+                <div className="p-3 text-sm text-muted-foreground">Loading beats...</div>
+              ) : beatLoadError ? (
+                <div className="p-3 text-sm text-amber-200/90">{beatLoadError}</div>
+              ) : visibleBeats.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground">No beats match your search.</div>
+              ) : (
+                <div className="grid gap-2">
+                  {visibleBeats.map((beat) => (
+                    <button
+                      key={beat.id}
+                      type="button"
+                      className="rounded-md border border-border/60 bg-background/40 px-3 py-2 text-left hover:bg-background/60"
+                      onClick={() => {
+                        setCurrentBeat(beat);
+                        setBeatPlaying(false);
+                        setBeatModalOpen(false);
+                      }}
+                    >
+                      <div className="text-sm font-medium">{beat.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {beat.artist} · {beat.tempo} BPM · {beat.genre}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Input value={"Search disabled"} readOnly />
             <Button variant="outline" onClick={() => setBeatModalOpen(false)}>
               Close
             </Button>
@@ -1626,3 +1712,7 @@ export function BattleRoomCockpit() {
     </div>
   );
 }
+
+
+
+

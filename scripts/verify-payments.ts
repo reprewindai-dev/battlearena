@@ -33,8 +33,8 @@ class PaymentVerifier {
     
     try {
       // Test Stripe API access
-      const account = await this.stripe.accounts.retrieve('acct_1');
-      console.log(`✅ Stripe connected: ${account.id}`);
+      const balance = await this.stripe.balance.retrieve();
+      console.log(`✅ Stripe connected (livemode=${balance.livemode})`);
       return true;
     } catch (error: any) {
       throw new Error(`Stripe connection failed: ${error?.message || 'Unknown error'}`);
@@ -290,3 +290,4 @@ class PaymentVerifier {
 // Run verification
 const verifier = new PaymentVerifier();
 verifier.run().catch(console.error);
+

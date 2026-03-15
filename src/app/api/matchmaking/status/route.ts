@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { isMockRuntimeEnabled } from "@/lib/auth/mock-runtime";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import {
   normalizeQueueMode,
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const queueType = normalizeQueueMode(url.searchParams.get("mode") ?? url.searchParams.get("queueType"));
   const battleFormat = url.searchParams.get("battleFormat") ?? "60s";
-  const testMode = process.env.ARENA_FORCE_MOCK_AUTH === "1";
+  const testMode = isMockRuntimeEnabled();
 
   try {
     if (testMode) {

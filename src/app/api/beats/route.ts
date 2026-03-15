@@ -1,8 +1,37 @@
+import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { createClient } from '@supabase/supabase-js';
-import { BeatService } from '@/lib/services/BeatService';
+import { z } from "zod";
 
-// GET /api/beats?genre=hip-hop&tempo_min=80&tempo_max=140&limit=50
+import { getSessionUser } from "@/lib/auth/session";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+
+const SORTABLE_FIELDS = new Set(["usage_count", "created_at", "tempo", "title"]);
+
+const BeatMetadataSchema = z.object({
+  title: z.string().min(1).max(255),
+  artist: z.string().min(1).max(255),
+  tempo: z.number().int().min(40).max(260),
+  genre: z.string().min(1).max(80),
+  key_signature: z.string().max(20).optional().nullable(),
+  duration_seconds: z.number().int().min(5).max(1800).optional().nullable(),
+  license_type: z.string().max(50).optional().nullable(),
+  tags: z.array(z.string().max(40)).max(20).optional(),
+});
+
+function sanitizePathPart(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "beat";
+}
+
+function getFileExtension(filename: string) {
+  const parts = filename.split(".");
+  if (parts.length < 2) return "bin";
+  return sanitizePathPart(parts.pop() || "bin");
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -11,26 +40,16 @@ export async function GET(req: Request) {
     const tempoMax = Number(url.searchParams.get("tempo_max") ?? 200);
     const limitRaw = Number(url.searchParams.get("limit") ?? 50);
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.floor(limitRaw))) : 50;
-    const sortBy = url.searchParams.get("sort_by") ?? "usage_count";
-    const sortOrder = url.searchParams.get("sort_order") ?? "desc";
-    const minRating = Number(url.searchParams.get("min_rating")) ?? null;
+    const sortByRaw = url.searchParams.get("sort_by") ?? "usage_count";
+    const sortBy = SORTABLE_FIELDS.has(sortByRaw) ? sortByRaw : "usage_count";
+    const sortOrder = url.searchParams.get("sort_order") === "asc" ? "asc" : "desc";
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
-    }
+    const adminClient = createSupabaseServiceRoleClient();
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    let query = supabase
+    let query = adminClient
       .from("beats")
-      .select(
-        "id,title,artist,tempo,key_signature,genre,duration_seconds,preview_url,file_url,license_type,license_url,source,usage_count,created_at,status,is_active,is_verified,tags,rating"
-      )
-      .eq("is_active", true)
-      .eq("status", "active");
+      .select("id,title,artist,tempo,key_signature,genre,duration_seconds,preview_url,file_url,license_type,usage_count,created_at")
+      .eq("is_active", true);
 
     if (genre && genre !== "all") {
       query = query.eq("genre", genre);
@@ -43,14 +62,7 @@ export async function GET(req: Request) {
       query = query.lte("tempo", Math.max(0, tempoMax));
     }
 
-    if (minRating && Number.isFinite(minRating)) {
-      query = query.gte("rating", minRating);
-    }
-
-    // Sorting
-    query = query.order(sortBy, { ascending: sortOrder === "asc" });
-
-    query = query.limit(limit);
+    query = query.order(sortBy, { ascending: sortOrder === "asc" }).limit(limit);
 
     const { data, error } = await query;
 
@@ -58,12 +70,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "beats_fetch_failed", details: error.message }, { status: 400 });
     }
 
-    // Return real beats with proper structure
-    return NextResponse.json({ 
-      ok: true, 
-      mode: "supabase", 
-      beats: data || [],
-      total: data?.length || 0,
+    return NextResponse.json({
+      ok: true,
+      mode: "supabase",
+      beats: data ?? [],
+      total: data?.length ?? 0,
       filters: {
         genre,
         tempoMin,
@@ -71,73 +82,117 @@ export async function GET(req: Request) {
         limit,
         sortBy,
         sortOrder,
-        minRating
-      }
+      },
     });
-
-  } catch (error: any) {
-    console.error('Error in beats API:', error);
-    return NextResponse.json({ 
-      error: "server_error", 
-      details: error.message || "Unknown error occurred" 
-    }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "server_error",
+        details: error instanceof Error ? error.message : "unknown_error",
+      },
+      { status: 500 },
+    );
   }
 }
 
-// POST /api/beats - Upload new beat
 export async function POST(req: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getSessionUser();
     if (!user) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const formData = await req.formData();
-    const beatData = JSON.parse(formData.get('beatData') as string);
-    const audioFile = formData.get('audioFile') as File;
-    const previewFile = formData.get('previewFile') as File;
+    const beatDataRaw = formData.get("beatData");
+    const audioFile = formData.get("audioFile");
+    const previewFile = formData.get("previewFile");
 
-    if (!audioFile || !previewFile) {
-      return NextResponse.json({ error: "audio and preview files required" }, { status: 400 });
+    if (!(audioFile instanceof File) || !(previewFile instanceof File)) {
+      return NextResponse.json({ error: "audio_and_preview_files_required" }, { status: 400 });
     }
 
-    // Validate file types
-    if (!audioFile.type.startsWith('audio/') || !previewFile.type.startsWith('audio/')) {
-      return NextResponse.json({ error: "invalid file types" }, { status: 400 });
+    if (typeof beatDataRaw !== "string") {
+      return NextResponse.json({ error: "beat_metadata_required" }, { status: 400 });
     }
 
-    // Validate file sizes (max 50MB for audio, 10MB for preview)
+    const metadataParse = BeatMetadataSchema.safeParse(JSON.parse(beatDataRaw));
+    if (!metadataParse.success) {
+      return NextResponse.json(
+        { error: "invalid_beat_metadata", details: metadataParse.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    if (!audioFile.type.startsWith("audio/") || !previewFile.type.startsWith("audio/")) {
+      return NextResponse.json({ error: "invalid_file_types" }, { status: 400 });
+    }
+
     if (audioFile.size > 50 * 1024 * 1024 || previewFile.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "files too large" }, { status: 400 });
+      return NextResponse.json({ error: "files_too_large" }, { status: 400 });
     }
 
-    // TODO: Implement actual file upload to storage service
-    // For now, return success response
-    return NextResponse.json({
-      ok: true,
-      message: "Beat upload received - processing",
-      beatData: {
-        title: beatData.title,
-        artist: beatData.artist,
-        tempo: beatData.tempo,
-        genre: beatData.genre
-      }
+    const adminClient = createSupabaseServiceRoleClient();
+    const bucket = process.env.BEATS_STORAGE_BUCKET ?? "beats";
+
+    const fileStem = `${Date.now()}-${randomUUID().slice(0, 8)}-${sanitizePathPart(metadataParse.data.title)}`;
+    const audioPath = `audio/${user.id}/${fileStem}.${getFileExtension(audioFile.name)}`;
+    const previewPath = `preview/${user.id}/${fileStem}.${getFileExtension(previewFile.name)}`;
+
+    const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
+    const previewBuffer = Buffer.from(await previewFile.arrayBuffer());
+
+    const audioUpload = await adminClient.storage.from(bucket).upload(audioPath, audioBuffer, {
+      contentType: audioFile.type,
+      upsert: false,
     });
+    if (audioUpload.error) {
+      return NextResponse.json({ error: "audio_upload_failed", details: audioUpload.error.message }, { status: 500 });
+    }
 
-  } catch (error: any) {
-    console.error('Error in beat upload:', error);
-    return NextResponse.json({ 
-      error: "upload_failed", 
-      details: error.message || "Unknown error occurred" 
-    }, { status: 500 });
+    const previewUpload = await adminClient.storage.from(bucket).upload(previewPath, previewBuffer, {
+      contentType: previewFile.type,
+      upsert: false,
+    });
+    if (previewUpload.error) {
+      await adminClient.storage.from(bucket).remove([audioPath]);
+      return NextResponse.json({ error: "preview_upload_failed", details: previewUpload.error.message }, { status: 500 });
+    }
+
+    const audioPublic = adminClient.storage.from(bucket).getPublicUrl(audioPath).data.publicUrl;
+    const previewPublic = adminClient.storage.from(bucket).getPublicUrl(previewPath).data.publicUrl;
+
+    const payload = metadataParse.data;
+    const { data: inserted, error: insertError } = await adminClient
+      .from("beats")
+      .insert({
+        title: payload.title,
+        artist: payload.artist,
+        tempo: payload.tempo,
+        key_signature: payload.key_signature ?? null,
+        genre: payload.genre,
+        duration_seconds: payload.duration_seconds ?? null,
+        file_url: audioPublic,
+        preview_url: previewPublic,
+        license_type: payload.license_type ?? "standard",
+        uploaded_by: user.id,
+        is_active: true,
+      })
+      .select("id,title,artist,tempo,key_signature,genre,duration_seconds,preview_url,file_url,license_type,usage_count,created_at")
+      .single();
+
+    if (insertError) {
+      await adminClient.storage.from(bucket).remove([audioPath, previewPath]);
+      return NextResponse.json({ error: "beat_insert_failed", details: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, mode: "supabase", beat: inserted }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "upload_failed",
+        details: error instanceof Error ? error.message : "unknown_error",
+      },
+      { status: 500 },
+    );
   }
-}
-
-async function getCurrentUser() {
-  // TODO: Implement proper user authentication
-  // For now, return a mock user for testing
-  return {
-    id: 'test-user-id',
-    email: 'test@arena.com'
-  };
 }

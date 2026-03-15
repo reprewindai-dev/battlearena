@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { isMockRuntimeEnabled } from "@/lib/auth/mock-runtime";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import {
   ensurePublicUser,
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
       typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
     const idempotencyKeyFromHeader = request.headers.get("x-idempotency-key")?.trim() ?? "";
     const idempotencyKey = idempotencyKeyFromHeader || idempotencyKeyFromBody;
-    const testMode = process.env.ARENA_FORCE_MOCK_AUTH === "1";
+    const testMode = isMockRuntimeEnabled();
 
     if (testMode) {
       const result = runTestModeMatchmaking({

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -7,6 +7,7 @@ import Providers from "@/app/providers";
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: "BattleArena - Where Beats Meet Battles",
   description: "The ultimate hip-hop battle platform. Compete in rap battles, showcase your beats, and win prizes.",
   keywords: ["hip-hop", "rap battles", "beats", "music battles", "trap", "drill", "battle arena"],
@@ -40,12 +41,13 @@ export const metadata: Metadata = {
     description: "The ultimate hip-hop battle platform. Compete in rap battles, showcase your beats, and win prizes.",
     images: ["/og-image.jpg"],
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#000000" },
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },

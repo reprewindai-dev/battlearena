@@ -150,8 +150,7 @@ export function TokenShop() {
       const response = await fetch('/api/economy/tokens/purchase', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           token_package: packageData?.tokens,
@@ -165,7 +164,7 @@ export function TokenShop() {
         throw new Error(error.error?.message || 'Failed to initiate purchase');
       }
 
-      const { payment_intent_client_secret } = await response.json();
+      const { payment_intent_client_secret, payment_intent_id } = await response.json();
       
       // Initialize Stripe checkout
       const stripe = (window as any).Stripe;
@@ -175,6 +174,21 @@ export function TokenShop() {
         throw new Error(result.error.message);
       }
 
+      const confirmResponse = await fetch('/api/economy/tokens/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          payment_intent_id: payment_intent_id || result.paymentIntent?.id
+        })
+      });
+
+      if (!confirmResponse.ok) {
+        const confirmError = await confirmResponse.json().catch(() => ({}));
+        throw new Error(confirmError.error?.message || confirmError.error || 'Payment confirmed but credit finalize failed');
+      }
+      
       toast.success(`Successfully purchased ${packageData?.tokens} tokens!`);
       setSelectedPackage(null);
     } catch (error) {
@@ -193,8 +207,7 @@ export function TokenShop() {
       const response = await fetch('/api/subscriptions/create', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           plan_id: planId,
@@ -207,14 +220,18 @@ export function TokenShop() {
         throw new Error(error.error?.message || 'Failed to create subscription');
       }
 
-      const { subscription_id, client_secret } = await response.json();
+      const { client_secret, status } = await response.json();
       
       // Initialize Stripe subscription
-      const stripe = (window as any).Stripe;
-      const result = await stripe.confirmCardSubscription(client_secret);
+      if (client_secret) {
+        const stripe = (window as any).Stripe;
+        const result = await stripe.confirmCardSubscription(client_secret);
       
-      if (result.error) {
-        throw new Error(result.error.message);
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+      } else if (status !== 'active') {
+        throw new Error('Subscription created but missing payment confirmation secret');
       }
 
       toast.success(`Successfully subscribed to ${planData?.name}!`);

@@ -2,13 +2,21 @@ import pg from 'pg';
 
 const { Client } = pg;
 
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 async function createPaymentSchema() {
   const client = new Client({
-    host: 'aws-1-us-east-1.pooler.supabase.com',
-    port: 6543,
-    database: 'postgres',
-    user: 'postgres.xjnxrkdtdfvusofiwshu',
-    password: 'kys48wlXoYWDbOEL',
+    host: requiredEnv('SUPABASE_DB_HOST'),
+    port: Number(process.env.SUPABASE_DB_PORT ?? '6543'),
+    database: process.env.SUPABASE_DB_NAME ?? 'postgres',
+    user: requiredEnv('SUPABASE_DB_USER'),
+    password: requiredEnv('SUPABASE_DB_PASSWORD'),
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: 10000,
     query_timeout: 30000

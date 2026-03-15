@@ -1,4 +1,5 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { isMockRuntimeEnabled } from "@/lib/auth/mock-runtime";
 
 export type SessionUser = {
   id: string;
@@ -18,7 +19,7 @@ export async function getClientSessionUser(): Promise<SessionUser | null> {
     // continue with local fallbacks
   }
 
-  const forceMockAuth = process.env.NEXT_PUBLIC_ARENA_FORCE_MOCK_AUTH === "1";
+  const forceMockAuth = isMockRuntimeEnabled();
   if (forceMockAuth && typeof document !== "undefined") {
     const rawCookies = document.cookie.split(";").map((v) => v.trim());
     const hasMockSession = rawCookies.some((v) => v === "arena_mock_session=1");
