@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -21,18 +20,6 @@ export async function GET(req: Request) {
   const battleId = url.searchParams.get("battleId");
   if (!battleId) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    const messages: ApiMessage[] = [
-      {
-        id: "m1",
-        author: "System",
-        body: "Battle session started (mock).",
-        ts: Date.now(),
-      },
-    ];
-    return NextResponse.json({ ok: true, mode: "mock", messages });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -107,10 +94,6 @@ export async function POST(req: Request) {
   }
   if (typeof messageBody !== "string" || messageBody.trim().length === 0) {
     return NextResponse.json({ error: "missing_body" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock" });
   }
 
   const supabase = await createSupabaseServerClient();

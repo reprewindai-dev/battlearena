@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -21,10 +20,6 @@ export async function POST(req: Request) {
 
   if (!battleId) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock", battleId, slot: 2 });
   }
 
   const supabase = await createSupabaseServerClient();

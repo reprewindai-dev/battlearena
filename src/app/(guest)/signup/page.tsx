@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const schema = z.object({
@@ -26,17 +25,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  async function handleMockSignup() {
-    const res = await fetch("/api/mock-login", { method: "POST" });
-    if (!res.ok) {
-      setError("Mock signup failed.");
-      return;
-    }
-    router.push("/app");
-    router.refresh();
-  }
-
-  async function handleSupabaseSignup() {
+  async function handleSignup() {
     setError(null);
 
     const parsed = schema.safeParse({ email, password });
@@ -69,7 +58,7 @@ export default function SignupPage() {
       <div className="md:col-span-6">
         <h1 className="text-3xl font-semibold tracking-tight">Sign up</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          For local development, mock signup will create a browser session cookie.
+          Create your Battle Arena account to start competing.
         </p>
       </div>
 
@@ -80,8 +69,7 @@ export default function SignupPage() {
             onSubmit={(e) => {
               e.preventDefault();
               startTransition(async () => {
-                if (isMockAuthEnabled) await handleMockSignup();
-                else await handleSupabaseSignup();
+                await handleSignup();
               });
             }}
           >
@@ -111,7 +99,7 @@ export default function SignupPage() {
             ) : null}
 
             <Button type="submit" className="w-full" disabled={pending}>
-              {isMockAuthEnabled ? "Create mock account" : "Create account"}
+              Create account
             </Button>
 
             <div className="text-sm text-muted-foreground">

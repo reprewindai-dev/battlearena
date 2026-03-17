@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { isMockAuthEnabled, isSupabaseConfigured } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type BattleRow = {
@@ -103,44 +102,6 @@ export default async function BattleHistoryPage(props: {
   }
 
   async function getHistory(): Promise<{ items: HistoryItem[]; total: number }> {
-    if (!isSupabaseConfigured || isMockAuthEnabled) {
-      const mock: BattleRow[] = [
-        {
-          id: "mock_history_01",
-          status: "complete",
-          mode: "freestyle",
-          created_at: null,
-          ended_at: null,
-          created_by: "mock-user-a",
-          result: { winner_slot: 1, votes: { slot1: 5, slot2: 2 } },
-        },
-        {
-          id: "mock_history_02",
-          status: "complete",
-          mode: "freestyle",
-          created_at: null,
-          ended_at: null,
-          created_by: "mock-user-b",
-          result: { winner_slot: 2, votes: { slot1: 3, slot2: 4 } },
-        },
-      ];
-
-      const filtered = mock.filter((b) => {
-        const statusOk = statusParam ? b.status === statusParam : true;
-        const modeOk = modeParam ? b.mode === modeParam : true;
-        return statusOk && modeOk;
-      });
-
-      const total = filtered.length;
-      const slice = filtered.slice((page - 1) * pageSize, page * pageSize);
-      const items: HistoryItem[] = slice.map((battle, idx) => ({
-        battle,
-        opponentLabel: idx % 2 === 0 ? "mock-user-b" : "mock-user-a",
-        outcomeLabel: "—",
-      }));
-      return { items, total };
-    }
-
     const supabase = await createSupabaseServerClient();
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
@@ -252,9 +213,7 @@ export default async function BattleHistoryPage(props: {
           <div>
             <div className="text-sm font-medium">Past battles</div>
             <div className="mt-1 text-xs text-muted-foreground">
-              {isMockAuthEnabled || !isSupabaseConfigured
-                ? "Mock list (Supabase not configured)"
-                : "Supabase-backed history"}
+              Your completed battles
             </div>
           </div>
           <Badge variant="secondary">history</Badge>

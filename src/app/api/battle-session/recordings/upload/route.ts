@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -42,20 +41,6 @@ export async function POST(req: Request) {
 
   if (typeof battleId !== "string" || battleId.length === 0) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    const mock = {
-      ok: true,
-      mode: "mock",
-      recordingId: `mock_${crypto.randomUUID()}`,
-      bucket: "battle-recordings",
-      path: `${battleId}/mock/${crypto.randomUUID()}.webm`,
-      token: "mock-token",
-      signedUrl: "",
-    } satisfies UploadInitResponse;
-
-    return NextResponse.json(mock);
   }
 
   const supabase = await createSupabaseServerClient();

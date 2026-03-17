@@ -5,19 +5,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FreestyleQueueCard } from "@/components/battle/FreestyleQueueCard";
 import { RankedQueueCard } from "@/components/battle/RankedQueueCard";
-import { isMockAuthEnabled, isSupabaseConfigured } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default function BattleLobbyPage() {
   async function getRecentBattles() {
-    if (!isSupabaseConfigured || isMockAuthEnabled) {
-      return [
-        { id: "mock_ionrunner_01", status: "live" as const, mode: "freestyle", created_at: null as string | null },
-        { id: "mock_glasscity_02", status: "queued" as const, mode: "freestyle", created_at: null as string | null },
-        { id: "mock_neondrift_03", status: "complete" as const, mode: "freestyle", created_at: null as string | null },
-      ];
-    }
-
     const supabase = await createSupabaseServerClient();
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
@@ -83,9 +74,7 @@ async function RecentBattles({
         <div>
           <div className="text-sm font-medium">Recent sessions</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {isMockAuthEnabled || !isSupabaseConfigured
-              ? "Mock list (Supabase not configured)"
-              : "Your latest battles (created by you)"}
+            Your latest battles (created by you)
           </div>
         </div>
         <Badge variant="secondary">live</Badge>

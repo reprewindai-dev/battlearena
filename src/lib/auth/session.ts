@@ -1,6 +1,4 @@
-import { cookies } from "next/headers";
-
-import { isMockAuthEnabled, mockUser, type AppRole } from "@/lib/auth/config";
+import { type AppRole } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type SessionUser = {
@@ -9,18 +7,6 @@ export type SessionUser = {
 };
 
 export async function getSessionUser(): Promise<SessionUser | null> {
-  if (isMockAuthEnabled) {
-    const cookieStore = await cookies();
-    const mockSession = cookieStore.get("arena_mock_session")?.value === "1";
-    if (!mockSession) return null;
-    const mockUserId = cookieStore.get("arena_mock_user_id")?.value;
-    const mockEmail = cookieStore.get("arena_mock_email")?.value;
-    return {
-      id: typeof mockUserId === "string" && mockUserId.length > 0 ? mockUserId : mockUser.id,
-      email: typeof mockEmail === "string" && mockEmail.length > 0 ? mockEmail : mockUser.email,
-    };
-  }
-
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error) return null;
@@ -33,24 +19,26 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 }
 
 export async function getSessionRole(): Promise<AppRole> {
-  const cookieStore = await cookies();
-  const role = cookieStore.get("arena_role")?.value;
-  if (role === "admin" || role === "mod" || role === "user") return role;
-  if (isMockAuthEnabled) {
-    const mockSession = cookieStore.get("arena_mock_session")?.value === "1";
-    if (mockSession) return "admin";
-  }
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getUser();
+  
+  if (!data.user) return "user";
 
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.getUser();
-    const claim =
-      (data.user?.app_metadata as { role?: unknown } | undefined)?.role ??
-      (data.user?.user_metadata as { role?: unknown } | undefined)?.role;
-    if (claim === "admin" || claim === "mod" || claim === "user") return claim;
-  } catch {
-    // ignore if Supabase not configured
-  }
+  // Check role from JWT claims
+  const claim =
+    (data.user.app_metadata as { role?: unknown } | undefined)?.role ??
+    (data.user.user_metadata as { role?: unknown } | undefined)?.role;
+  if (claim === "admin" || claim === "mod" || claim === "user") return claim;
+
+  // Check role from database
+  const { data: assignments } = await supabase
+    .from("role_assignments")
+    .select("roles(name)")
+    .eq("user_id", data.user.id);
+
+  const roles = assignments?.map((a) => (a.roles as { name: string }[])?.[0]?.name).filter(Boolean) || [];
+  if (roles.includes("admin")) return "admin";
+  if (roles.includes("mod")) return "mod";
 
   return "user";
 }

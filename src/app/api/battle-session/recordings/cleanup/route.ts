@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -18,10 +17,6 @@ export async function POST(req: Request) {
 
   if (typeof recordingId !== "string" || recordingId.length === 0) {
     return NextResponse.json({ error: "missing_recordingId" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock" as const });
   }
 
   const supabase = await createSupabaseServerClient();

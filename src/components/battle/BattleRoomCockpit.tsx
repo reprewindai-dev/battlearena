@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { VideoBattle } from "@/components/battle/VideoBattle";
 import { useBattleSessionStore, type BattleSessionMode } from "@/lib/battle/session-store";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { trackUsage, checkUsageLimit } from "@/lib/usage/tracker";
 
 type BattleParticipant = {
   user_id: string;
@@ -163,6 +164,13 @@ export function BattleRoomCockpit() {
 
     async function ensureSession() {
       try {
+        // Check usage limit before creating battle
+        const canCreate = await checkUsageLimit("battle_created");
+        if (!canCreate) {
+          setSessionError("Battle limit reached. Upgrade your plan to create more battles.");
+          return;
+        }
+
         const res = await fetch("/api/battle-session", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -180,6 +188,9 @@ export function BattleRoomCockpit() {
         setSessionId(body.battleId);
         setSessionMode(body.mode);
         setStoredSession({ battleId: body.battleId, mode: body.mode });
+
+        // Track battle creation
+        await trackUsage("battle_created", { battleId: body.battleId });
 
         const next = new URLSearchParams(searchParams.toString());
         next.set("battleId", body.battleId);
@@ -462,7 +473,7 @@ export function BattleRoomCockpit() {
   }, []);
 
   const [messages, setMessages] = React.useState<ChatMessage[]>([
-    { id: "m1", author: "System", body: "Battle session started (mock).", ts: 0 },
+    { id: "m1", author: "System", body: "Battle session started.", ts: 0 },
   ]);
   const [chatDraft, setChatDraft] = React.useState("");
   const [onlineCount, setOnlineCount] = React.useState<number | null>(null);
@@ -1079,7 +1090,7 @@ export function BattleRoomCockpit() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Battle Room</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Battle cockpit UI (interactive placeholders; mock session).
+            Live battle cockpit.
           </p>
         </div>
         <div className="text-right text-xs text-muted-foreground">
@@ -1187,8 +1198,14 @@ export function BattleRoomCockpit() {
         <VideoBattle
           localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
           mode={sessionMode ?? "mock"}
-          onStreamReady={(stream) => {
-            // Optional: handle stream ready for recording/broadcast
+          onStreamReady={async (stream) => {
+            // Check video session limit before tracking
+            const canUseVideo = await checkUsageLimit("video_session");
+            if (!canUseVideo) {
+              console.warn("Video session limit reached for current plan");
+            }
+            // Track video session usage
+            await trackUsage("video_session", { battleId: sessionId });
             console.log("Local video stream ready:", stream);
           }}
         />

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -20,15 +19,6 @@ export async function GET(req: Request) {
   const battleId = url.searchParams.get("battleId");
   if (!battleId) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    return NextResponse.json({
-      ok: true,
-      mode: "mock",
-      counts: { 1: 0, 2: 0 },
-      my_vote: null,
-    });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -80,10 +70,6 @@ export async function POST(req: Request) {
   const slot = parseVoteSlot(slotValue);
   if (!slot) {
     return NextResponse.json({ error: "invalid_slot" }, { status: 400 });
-  }
-
-  if (isMockAuthEnabled) {
-    return NextResponse.json({ ok: true, mode: "mock", slot });
   }
 
   const supabase = await createSupabaseServerClient();

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -30,20 +29,6 @@ export async function GET(req: Request) {
 
   const action = url.searchParams.get("action");
   const q = url.searchParams.get("q");
-
-  if (isMockAuthEnabled) {
-    const rows: AuditLogRow[] = [
-      {
-        id: crypto.randomUUID(),
-        actor_user_id: user.id,
-        action: "recordings_cleanup_stale",
-        payload: { mock: true, scanned_rows: 0, deleted_rows: 0 },
-        created_at: new Date().toISOString(),
-      },
-    ];
-
-    return NextResponse.json({ ok: true, mode: "mock" as const, rows });
-  }
 
   const supabase = await createSupabaseServerClient();
 

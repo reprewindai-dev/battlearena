@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { isMockAuthEnabled } from "@/lib/auth/config";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
@@ -66,19 +65,6 @@ export async function POST(req: Request) {
   const concurrencyRaw = url.searchParams.get("concurrency");
   const concurrency = concurrencyRaw ? Number(concurrencyRaw) : 4;
   const safeConcurrency = Number.isFinite(concurrency) ? Math.max(1, Math.min(10, Math.floor(concurrency))) : 4;
-
-  if (isMockAuthEnabled) {
-    const res: CleanupResult = {
-      ok: true,
-      mode: "mock",
-      scanned_rows: 0,
-      deleted_rows: 0,
-      deleted_objects: 0,
-      row_delete_errors: 0,
-      object_delete_errors: 0,
-    };
-    return NextResponse.json(res);
-  }
 
   const supabase = cronAuthed
     ? createSupabaseServiceRoleClient()
