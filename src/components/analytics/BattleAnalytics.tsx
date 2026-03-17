@@ -13,7 +13,7 @@ type BattleAnalytics = {
   avgEngagement: number;
   avgAudioQuality: number;
   avgVideoQuality: number;
-  totalEarnings: number;
+  totalEarningsTokens: number;
   monthlyGrowth: number;
   recentBattles: Array<{
     id: string;
@@ -21,14 +21,14 @@ type BattleAnalytics = {
     result: "win" | "loss" | "tie";
     viewers: number;
     engagement: number;
-    earnings: number;
+    earningsTokens: number;
     date: string;
   }>;
 };
 
 export function BattleAnalytics({ analytics }: { analytics: BattleAnalytics }) {
   const formatPercent = (value: number) => `${(value * 100).toFixed(1)}%`;
-  const formatCurrency = (value: number) => `$${value.toFixed(2)}`;
+  const formatTokens = (value: number) => `${value.toLocaleString()} tokens`;
 
   return (
     <div className="space-y-6">
@@ -75,8 +75,8 @@ export function BattleAnalytics({ analytics }: { analytics: BattleAnalytics }) {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(analytics.totalEarnings)}</div>
-            <p className="text-xs text-muted-foreground">All time</p>
+            <div className="text-2xl font-bold">{formatTokens(analytics.totalEarningsTokens)}</div>
+            <p className="text-xs text-muted-foreground">Battle winnings</p>
           </CardContent>
         </Card>
       </div>
@@ -139,7 +139,7 @@ export function BattleAnalytics({ analytics }: { analytics: BattleAnalytics }) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">{formatCurrency(battle.earnings)}</p>
+                  <p className="font-medium">{formatTokens(battle.earningsTokens)}</p>
                   <p className="text-sm text-muted-foreground">{battle.viewers} viewers</p>
                 </div>
               </div>

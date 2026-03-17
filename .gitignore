@@ -46,3 +46,5 @@ next-env.d.ts
 /arena-web/
 package.monorepo.json
 package-lock.monorepo.json
+/battlearena/
+/windsurf-project-3/

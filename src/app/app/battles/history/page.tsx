@@ -1,8 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { isSupabaseConfigured } from "@/lib/auth/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type BattleRow = {
@@ -30,7 +31,7 @@ type ProfileRow = {
 type HistoryItem = {
   battle: BattleRow;
   opponentLabel: string;
-  outcomeLabel: "win" | "loss" | "tie" | "—";
+  outcomeLabel: "win" | "loss" | "tie" | "â€”";
 };
 
 function safeInt(value: string | null) {
@@ -44,13 +45,13 @@ function pickOpponentLabel(params: {
   profilesByUserId: Map<string, ProfileRow>;
 }) {
   const { uid, participants, profilesByUserId } = params;
-  const opp = participants.find((p) => p.user_id !== uid);
-  if (!opp) return "—";
+  const opp = participants.find((p: any) => p.user_id !== uid);
+  if (!opp) return "â€”";
   const prof = profilesByUserId.get(opp.user_id);
   return (
     prof?.handle ??
     prof?.display_name ??
-    (opp.user_id.length > 10 ? `${opp.user_id.slice(0, 8)}…` : opp.user_id)
+    (opp.user_id.length > 10 ? `${opp.user_id.slice(0, 8)}â€¦` : opp.user_id)
   );
 }
 
@@ -60,8 +61,8 @@ function pickOutcomeLabel(params: {
   result: unknown | null | undefined;
 }): HistoryItem["outcomeLabel"] {
   const { uid, participants, result } = params;
-  const viewer = participants.find((p) => p.user_id === uid);
-  if (!viewer) return "—";
+  const viewer = participants.find((p: any) => p.user_id === uid);
+  if (!viewer) return "â€”";
 
   const winnerSlot =
     result && typeof result === "object" && "winner_slot" in result
@@ -102,6 +103,10 @@ export default async function BattleHistoryPage(props: {
   }
 
   async function getHistory(): Promise<{ items: HistoryItem[]; total: number }> {
+    if (!isSupabaseConfigured) {
+      return { items: [], total: 0 }; // Supabase not configured
+    }
+
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { items: [], total: 0 }; // Handle null return
 
@@ -126,21 +131,21 @@ export default async function BattleHistoryPage(props: {
       .limit(50);
 
     const participated = (participantJoinRows ?? [])
-      .flatMap((r) => {
+      .flatMap((r: any) => {
         const joined = (r as { battles?: unknown }).battles;
         if (!joined) return [];
         if (Array.isArray(joined)) return joined as BattleRow[];
         return [joined as BattleRow];
       })
-      .filter((b): b is BattleRow => Boolean(b));
+      .filter((b: unknown): b is BattleRow => Boolean(b));
 
     const merged = uniqueById([...(createdByMe ?? []), ...participated]);
 
     const filtered = merged
-      .filter((b) => b.status === "complete" || b.status === "canceled")
-      .filter((b) => (statusParam ? b.status === statusParam : true))
-      .filter((b) => (modeParam ? b.mode === modeParam : true))
-      .sort((a, b) => {
+      .filter((b: any) => b.status === "complete" || b.status === "canceled")
+      .filter((b: any) => (statusParam ? b.status === statusParam : true))
+      .filter((b: any) => (modeParam ? b.mode === modeParam : true))
+      .sort((a: BattleRow, b: BattleRow) => {
         const ta = new Date(a.created_at ?? 0).getTime();
         const tb = new Date(b.created_at ?? 0).getTime();
         return tb - ta;
@@ -148,7 +153,7 @@ export default async function BattleHistoryPage(props: {
 
     const total = filtered.length;
     const slice = filtered.slice((page - 1) * pageSize, page * pageSize);
-    const battleIds = slice.map((b) => b.id);
+    const battleIds = slice.map((b: any) => b.id);
 
     const { data: participants } = await supabase
       .from("battle_participants")
@@ -156,7 +161,7 @@ export default async function BattleHistoryPage(props: {
       .in("battle_id", battleIds);
 
     const participantRows: ParticipantRow[] = ((participants ?? []) as ParticipantRow[]) ?? [];
-    const userIds = Array.from(new Set(participantRows.map((p) => p.user_id)));
+    const userIds = Array.from(new Set(participantRows.map((p: any) => p.user_id)));
     const { data: profiles } = await supabase
       .from("profiles")
       .select("user_id,handle,display_name")
@@ -174,7 +179,7 @@ export default async function BattleHistoryPage(props: {
       participantsByBattleId.set(p.battle_id, arr);
     }
 
-    const items: HistoryItem[] = slice.map((battle) => {
+    const items: HistoryItem[] = slice.map((battle: any) => {
       const parts = participantsByBattleId.get(battle.id) ?? [];
       return {
         battle,
@@ -215,7 +220,9 @@ export default async function BattleHistoryPage(props: {
           <div>
             <div className="text-sm font-medium">Past battles</div>
             <div className="mt-1 text-xs text-muted-foreground">
-              Your completed battles
+              {!isSupabaseConfigured
+                ? "Supabase not configured"
+                : "Supabase-backed history"}
             </div>
           </div>
           <Badge variant="secondary">history</Badge>
@@ -249,7 +256,7 @@ export default async function BattleHistoryPage(props: {
           {history.items.length === 0 ? (
             <div className="text-sm text-muted-foreground">No completed battles yet.</div>
           ) : (
-            history.items.map((item) => (
+            history.items.map((item: any) => (
               <div
                 key={item.battle.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/20 px-4 py-3"
@@ -257,9 +264,9 @@ export default async function BattleHistoryPage(props: {
                 <div className="min-w-[240px]">
                   <div className="font-mono text-sm text-foreground">{item.battle.id}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {item.battle.mode} · {item.battle.status}
+                    {item.battle.mode} Â· {item.battle.status}
                     {item.battle.created_at
-                      ? ` · ${new Date(item.battle.created_at).toLocaleString()}`
+                      ? ` Â· ${new Date(item.battle.created_at).toLocaleString()}`
                       : ""}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
@@ -286,7 +293,7 @@ export default async function BattleHistoryPage(props: {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
-            Page {page} of {totalPages} · {history.total} total
+            Page {page} of {totalPages} Â· {history.total} total
           </div>
           <div className="flex items-center gap-2">
             <Button asChild size="sm" variant="outline" disabled={page <= 1}>
@@ -301,3 +308,4 @@ export default async function BattleHistoryPage(props: {
     </div>
   );
 }
+

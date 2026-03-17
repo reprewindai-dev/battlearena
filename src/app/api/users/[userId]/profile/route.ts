@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
@@ -27,7 +27,7 @@ export async function GET(
     .select("battle_id,user_id,slot,score")
     .eq("user_id", userId)
     .limit(20);
-  const battleIds = Array.from(new Set((recentParticipantRows ?? []).map((row) => row.battle_id)));
+  const battleIds = Array.from(new Set((recentParticipantRows ?? []).map((row: any) => row.battle_id)));
   const { data: battles } = battleIds.length
     ? await supabase
         .from("battles")
@@ -126,3 +126,4 @@ export async function PATCH(
 
   return NextResponse.json({ profile: data });
 }
+

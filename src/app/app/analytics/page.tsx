@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { BattleAnalytics } from "@/components/analytics/BattleAnalytics";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 type AnalyticsData = {
   totalBattles: number;
@@ -11,7 +10,7 @@ type AnalyticsData = {
   avgEngagement: number;
   avgAudioQuality: number;
   avgVideoQuality: number;
-  totalEarnings: number;
+  totalEarningsTokens: number;
   monthlyGrowth: number;
   recentBattles: Array<{
     id: string;
@@ -19,7 +18,7 @@ type AnalyticsData = {
     result: "win" | "loss" | "tie";
     viewers: number;
     engagement: number;
-    earnings: number;
+    earningsTokens: number;
     date: string;
   }>;
 };
@@ -29,22 +28,10 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  const supabase = createSupabaseBrowserClient();
-
   React.useEffect(() => {
     async function fetchAnalytics() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          setError("Authentication required");
-          return;
-        }
-
-        const response = await fetch("/api/analytics", {
-          headers: {
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-        });
+        const response = await fetch("/api/analytics");
 
         if (response.status === 403) {
           setError("Analytics requires a Pro subscription");
@@ -65,7 +52,7 @@ export default function AnalyticsPage() {
     }
 
     fetchAnalytics();
-  }, [supabase]);
+  }, []);
 
   if (isLoading) {
     return (

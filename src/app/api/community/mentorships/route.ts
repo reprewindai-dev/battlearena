@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
@@ -37,7 +37,7 @@ export async function GET() {
 
   const userIds = Array.from(
     new Set(
-      (data ?? []).flatMap((row) => [
+      (data ?? []).flatMap((row: any) => [
         (row as { mentor_id: string }).mentor_id,
         (row as { mentee_id: string }).mentee_id,
       ]),
@@ -47,10 +47,10 @@ export async function GET() {
     ? await supabase.from("users").select("id,username").in("id", userIds)
     : { data: [] as Array<{ id: string; username: string | null }> };
 
-  const usersById = new Map((users ?? []).map((u) => [u.id, u]));
+  const usersById = new Map((users ?? []).map((u: any) => [u.id, u]));
 
   return NextResponse.json({
-    items: (data ?? []).map((row) => {
+    items: (data ?? []).map((row: any) => {
       const mentorId = (row as { mentor_id: string }).mentor_id;
       const menteeId = (row as { mentee_id: string }).mentee_id;
       return {
@@ -116,3 +116,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ item: data }, { status: 201 });
 }
+

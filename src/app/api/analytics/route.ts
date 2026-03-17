@@ -1,48 +1,99 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+
+import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { headers } from "next/headers";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function GET(_request: NextRequest) {
+type BattleParticipantRow = {
+  user_id: string;
+  slot: number;
+};
+
+type BattleAnalyticsRow = {
+  viewer_count: number | null;
+  engagement_score: number | null;
+  audio_quality_score: number | null;
+  video_quality_score: number | null;
+  session_duration_seconds: number | null;
+};
+
+type BattleRow = {
+  id: string;
+  created_at: string | null;
+  result: { winner_slot?: number | null } | null;
+  entry_fee_tokens: number | null;
+  battle_participants: BattleParticipantRow[];
+  battle_analytics: BattleAnalyticsRow[];
+};
+
+function toBattleResult(
+  battle: BattleRow,
+  userId: string,
+): "win" | "loss" | "tie" {
+  const userSlot = battle.battle_participants.find((p) => p.user_id === userId)?.slot;
+  const winnerSlot = battle.result?.winner_slot ?? null;
+  if (!winnerSlot || !userSlot) return "tie";
+  return winnerSlot === userSlot ? "win" : "loss";
+}
+
+function calculateBattleEarningsTokens(battle: BattleRow, result: "win" | "loss" | "tie") {
+  if (result !== "win") return 0;
+  const entryFee = battle.entry_fee_tokens ?? 0;
+  if (entryFee <= 0) return 0;
+  const participantCount = Math.max(1, battle.battle_participants.length);
+  return entryFee * participantCount;
+}
+
+export async function GET() {
   try {
-    const supabase = await createSupabaseServerClient();
-    const headersList = await headers();
-    const authHeader = headersList.get("authorization");
-
-    if (!authHeader?.startsWith("Bearer ")) {
+    const user = await getSessionUser();
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) {
+      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
     }
 
-    // Check if user has analytics access
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("subscription_tier")
-      .eq("user_id", user.id)
-      .single();
+    const [profileRes, billingProfileRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("subscription_tier")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("user_billing_profiles")
+        .select("active_subscription_plan,active_subscription_status")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
 
-    if (!profile || (profile.subscription_tier !== "pro" && profile.subscription_tier !== "enterprise")) {
+    const tier = profileRes.data?.subscription_tier ?? "free";
+    const billingPlan = billingProfileRes.data?.active_subscription_plan ?? null;
+    const billingStatus = billingProfileRes.data?.active_subscription_status ?? null;
+
+    const hasAnalyticsAccess =
+      tier === "pro" ||
+      tier === "enterprise" ||
+      ((billingPlan === "pro" || billingPlan === "enterprise") &&
+        (billingStatus === "active" || billingStatus === "trialing"));
+
+    if (!hasAnalyticsAccess) {
       return NextResponse.json({ error: "Analytics requires Pro plan" }, { status: 403 });
     }
 
-    // Get battle analytics
-    const { data: battles } = await supabase
+    const { data: battlesData, error: battlesError } = await supabase
       .from("battles")
       .select(`
         id,
         created_at,
         result,
+        entry_fee_tokens,
         battle_participants!inner(
           user_id,
           slot
         ),
-        battle_analytics!inner(
+        battle_analytics(
           viewer_count,
           engagement_score,
           audio_quality_score,
@@ -54,7 +105,15 @@ export async function GET(_request: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (!battles) {
+    if (battlesError) {
+      return NextResponse.json(
+        { error: "analytics_query_failed", details: battlesError.message },
+        { status: 400 },
+      );
+    }
+
+    const battles = (battlesData ?? []) as BattleRow[];
+    if (!battles.length) {
       return NextResponse.json({
         totalBattles: 0,
         winRate: 0,
@@ -62,62 +121,79 @@ export async function GET(_request: NextRequest) {
         avgEngagement: 0,
         avgAudioQuality: 0,
         avgVideoQuality: 0,
-        totalEarnings: 0,
+        totalEarningsTokens: 0,
         monthlyGrowth: 0,
         recentBattles: [],
       });
     }
 
-    // Calculate analytics
     const totalBattles = battles.length;
-    const wins = battles.filter(b => {
-      const result = b.result as { winner_slot?: number | null } | null;
-      return result?.winner_slot === b.battle_participants.find(p => p.user_id === user.id)?.slot;
-    }).length;
+    const battleWithResult = battles.map((battle) => {
+      const result = toBattleResult(battle, user.id);
+      const earningsTokens = calculateBattleEarningsTokens(battle, result);
+      return { battle, result, earningsTokens };
+    });
+
+    const wins = battleWithResult.filter((row) => row.result === "win").length;
     const winRate = totalBattles > 0 ? wins / totalBattles : 0;
 
-    const avgViewers = battles.reduce((sum, b) => sum + (b.battle_analytics[0]?.viewer_count || 0), 0) / totalBattles;
-    const avgEngagement = battles.reduce((sum, b) => sum + (b.battle_analytics[0]?.engagement_score || 0), 0) / totalBattles;
-    const avgAudioQuality = battles.reduce((sum, b) => sum + (b.battle_analytics[0]?.audio_quality_score || 0), 0) / totalBattles;
-    const avgVideoQuality = battles.reduce((sum, b) => sum + (b.battle_analytics[0]?.video_quality_score || 0), 0) / totalBattles;
+    const avgViewers =
+      battleWithResult.reduce(
+        (sum, row) => sum + (row.battle.battle_analytics[0]?.viewer_count ?? 0),
+        0,
+      ) / totalBattles;
+    const avgEngagement =
+      battleWithResult.reduce(
+        (sum, row) => sum + Number(row.battle.battle_analytics[0]?.engagement_score ?? 0),
+        0,
+      ) / totalBattles;
+    const avgAudioQuality =
+      battleWithResult.reduce(
+        (sum, row) => sum + Number(row.battle.battle_analytics[0]?.audio_quality_score ?? 0),
+        0,
+      ) / totalBattles;
+    const avgVideoQuality =
+      battleWithResult.reduce(
+        (sum, row) => sum + Number(row.battle.battle_analytics[0]?.video_quality_score ?? 0),
+        0,
+      ) / totalBattles;
 
-    // Calculate earnings (mock for now)
-    const totalEarnings = wins * 5.00; // $5 per win
+    const totalEarningsTokens = battleWithResult.reduce(
+      (sum, row) => sum + row.earningsTokens,
+      0,
+    );
 
-    // Calculate monthly growth
-    const thisMonth = new Date().getMonth();
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
     const lastMonth = thisMonth === 0 ? 11 : thisMonth - 1;
-    const thisYear = new Date().getFullYear();
-    const lastYear = thisMonth === 0 ? thisYear - 1 : thisYear;
+    const lastMonthYear = thisMonth === 0 ? thisYear - 1 : thisYear;
 
-    const thisMonthBattles = battles.filter(b => {
-      const date = new Date(b.created_at!);
+    const thisMonthBattles = battles.filter((battle) => {
+      if (!battle.created_at) return false;
+      const date = new Date(battle.created_at);
       return date.getMonth() === thisMonth && date.getFullYear() === thisYear;
     }).length;
 
-    const lastMonthBattles = battles.filter(b => {
-      const date = new Date(b.created_at!);
-      return date.getMonth() === lastMonth && date.getFullYear() === lastYear;
+    const lastMonthBattles = battles.filter((battle) => {
+      if (!battle.created_at) return false;
+      const date = new Date(battle.created_at);
+      return date.getMonth() === lastMonth && date.getFullYear() === lastMonthYear;
     }).length;
 
-    const monthlyGrowth = lastMonthBattles > 0 ? (thisMonthBattles - lastMonthBattles) / lastMonthBattles : 0;
+    const monthlyGrowth =
+      lastMonthBattles > 0 ? (thisMonthBattles - lastMonthBattles) / lastMonthBattles : 0;
 
-    // Format recent battles
-    const recentBattles = battles.slice(0, 10).map(battle => {
-      const participant = battle.battle_participants.find(p => p.user_id !== user.id);
-      const battleResult = battle.result as { winner_slot?: number | null } | null;
-      const userSlot = battle.battle_participants.find(p => p.user_id === user.id)?.slot;
-      const result = battleResult?.winner_slot === userSlot ? "win" : 
-                    battleResult?.winner_slot ? "loss" : "tie";
-      
+    const recentBattles = battleWithResult.slice(0, 10).map((row) => {
+      const opponent = row.battle.battle_participants.find((p) => p.user_id !== user.id);
       return {
-        id: battle.id,
-        opponent: participant?.user_id || "Unknown",
-        result,
-        viewers: battle.battle_analytics[0]?.viewer_count || 0,
-        engagement: battle.battle_analytics[0]?.engagement_score || 0,
-        earnings: result === "win" ? 5.00 : 0,
-        date: battle.created_at!,
+        id: row.battle.id,
+        opponent: opponent?.user_id ?? "unknown",
+        result: row.result,
+        viewers: row.battle.battle_analytics[0]?.viewer_count ?? 0,
+        engagement: Number(row.battle.battle_analytics[0]?.engagement_score ?? 0),
+        earningsTokens: row.earningsTokens,
+        date: row.battle.created_at ?? new Date().toISOString(),
       };
     });
 
@@ -128,7 +204,7 @@ export async function GET(_request: NextRequest) {
       avgEngagement,
       avgAudioQuality,
       avgVideoQuality,
-      totalEarnings,
+      totalEarningsTokens,
       monthlyGrowth,
       recentBattles,
     });
@@ -136,7 +212,7 @@ export async function GET(_request: NextRequest) {
     console.error("Analytics fetch failed:", error);
     return NextResponse.json(
       { error: "Failed to fetch analytics" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -38,6 +38,16 @@ type Participant = {
     tier: string;
   };
 };
+type UserRow = { id: string; username: string | null };
+type UserProfileRow = { user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null };
+type UserRatingRow = { user_id: string; rating: number | null; tier: string | null };
+type ParticipantRow = {
+  id: string;
+  status: string;
+  seed_number: number | null;
+  registered_at: string;
+  user_id: string;
+};
 
 const STATUS_COLORS: Record<string, string> = {
   upcoming: "border-slate-500/40 text-slate-400",
@@ -103,24 +113,25 @@ export default async function TournamentDetailPage({
     .eq("tournament_id", id)
     .order("seed_number", { ascending: true, nullsFirst: false });
 
-  const userIds = Array.from(new Set((participantRows ?? []).map((row) => row.user_id)));
+  const typedParticipantRows = (participantRows ?? []) as ParticipantRow[];
+  const userIds = Array.from(new Set(typedParticipantRows.map((row) => row.user_id)));
   const [{ data: users }, { data: profiles }, { data: ratings }] = await Promise.all([
     userIds.length
       ? supabase.from("users").select("id,username").in("id", userIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; username: string | null }> }),
+      : Promise.resolve({ data: [] as UserRow[] }),
     userIds.length
       ? supabase.from("user_profiles").select("user_id,display_name,avatar_url,tier").in("user_id", userIds)
-      : Promise.resolve({ data: [] as Array<{ user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null }> }),
+      : Promise.resolve({ data: [] as UserProfileRow[] }),
     userIds.length
       ? supabase.from("user_ratings").select("user_id,rating,tier").in("user_id", userIds)
-      : Promise.resolve({ data: [] as Array<{ user_id: string; rating: number | null; tier: string | null }> }),
+      : Promise.resolve({ data: [] as UserRatingRow[] }),
   ]);
 
-  const usersById = new Map((users ?? []).map((u) => [u.id, u]));
-  const profilesById = new Map((profiles ?? []).map((p) => [p.user_id, p]));
-  const ratingsById = new Map((ratings ?? []).map((r) => [r.user_id, r]));
+  const usersById = new Map<string, UserRow>(((users ?? []) as UserRow[]).map((u) => [u.id, u]));
+  const profilesById = new Map<string, UserProfileRow>(((profiles ?? []) as UserProfileRow[]).map((p) => [p.user_id, p]));
+  const ratingsById = new Map<string, UserRatingRow>(((ratings ?? []) as UserRatingRow[]).map((r) => [r.user_id, r]));
 
-  const participants: Participant[] = (participantRows ?? []).map((row) => {
+  const participants: Participant[] = typedParticipantRows.map((row) => {
     const user = usersById.get(row.user_id);
     const profile = profilesById.get(row.user_id);
     const rating = ratingsById.get(row.user_id);
@@ -211,7 +222,7 @@ export default async function TournamentDetailPage({
             label: "Starts",
             value: formatDate(tournament.starts_at),
           },
-        ].map((s) => (
+        ].map((s: any) => (
           <Card key={s.label} className="border-border/60 bg-card/30 p-4">
             <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
               {s.icon}
@@ -278,3 +289,4 @@ export default async function TournamentDetailPage({
     </div>
   );
 }
+

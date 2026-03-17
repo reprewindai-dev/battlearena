@@ -4,14 +4,14 @@ import { createServerClient } from "@supabase/ssr";
 
 import { env } from "@/env";
 
-export async function createSupabaseServerClient() {
+export async function createSupabaseServerClient(): Promise<any> {
   const cookieStore = await cookies();
   const publicKey =
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
   if (!env.NEXT_PUBLIC_SUPABASE_URL || !publicKey) {
-    return null; // Return null instead of throwing error
+    return null;
   }
 
   return createServerClient(

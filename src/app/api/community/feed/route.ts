@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type FeedRow = {
@@ -10,6 +10,9 @@ type FeedRow = {
   created_at: string;
   actor_id: string;
 };
+type UserRow = { id: string; username: string | null; is_verified: boolean | null };
+type UserProfileRow = { user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null };
+type UserRatingRow = { user_id: string; rating: number | null; tier: string | null };
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -52,7 +55,7 @@ export async function GET(req: NextRequest) {
   }
 
   const feedRows = (data ?? []) as FeedRow[];
-  const actorIds = Array.from(new Set(feedRows.map((row) => row.actor_id)));
+  const actorIds = Array.from(new Set(feedRows.map((row: any) => row.actor_id)));
 
   const [{ data: users }, { data: profiles }, { data: ratings }] = await Promise.all([
     actorIds.length
@@ -66,11 +69,11 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] as Array<{ user_id: string; rating: number | null; tier: string | null }> }),
   ]);
 
-  const usersById = new Map((users ?? []).map((row) => [row.id, row]));
-  const profilesByUserId = new Map((profiles ?? []).map((row) => [row.user_id, row]));
-  const ratingsByUserId = new Map((ratings ?? []).map((row) => [row.user_id, row]));
+  const usersById = new Map<string, UserRow>(((users ?? []) as UserRow[]).map((row) => [row.id, row]));
+  const profilesByUserId = new Map<string, UserProfileRow>(((profiles ?? []) as UserProfileRow[]).map((row) => [row.user_id, row]));
+  const ratingsByUserId = new Map<string, UserRatingRow>(((ratings ?? []) as UserRatingRow[]).map((row) => [row.user_id, row]));
 
-  const items = feedRows.map((row) => {
+  const items = feedRows.map((row: any) => {
     const user = usersById.get(row.actor_id);
     const profile = profilesByUserId.get(row.actor_id);
     const rating = ratingsByUserId.get(row.actor_id);
@@ -136,3 +139,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ item: data }, { status: 201 });
 }
+

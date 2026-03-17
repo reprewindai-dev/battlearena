@@ -1,9 +1,21 @@
 import Stripe from "stripe";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2023-10-16",
-  typescript: true,
-});
+let stripeClient: Stripe | null = null;
+
+export function getBillingStripeClient() {
+  if (stripeClient) {
+    return stripeClient;
+  }
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error("stripe_secret_key_missing");
+  }
+  stripeClient = new Stripe(secretKey, {
+    apiVersion: "2025-02-24.acacia",
+    typescript: true,
+  });
+  return stripeClient;
+}
 
 export const PLANS = {
   free: {
@@ -32,6 +44,7 @@ export const PLANS = {
 export type PlanType = keyof typeof PLANS;
 
 export async function createCheckoutSession(userId: string, planType: PlanType) {
+  const stripe = getBillingStripeClient();
   const plan = PLANS[planType];
   
   const session = await stripe.checkout.sessions.create({
@@ -56,6 +69,7 @@ export async function createCheckoutSession(userId: string, planType: PlanType) 
 }
 
 export async function createCustomer(userId: string, email: string) {
+  const stripe = getBillingStripeClient();
   const customer = await stripe.customers.create({
     email,
     metadata: { userId },
@@ -65,14 +79,17 @@ export async function createCustomer(userId: string, email: string) {
 }
 
 export async function getSubscription(subscriptionId: string) {
+  const stripe = getBillingStripeClient();
   return await stripe.subscriptions.retrieve(subscriptionId);
 }
 
 export async function cancelSubscription(subscriptionId: string) {
+  const stripe = getBillingStripeClient();
   return await stripe.subscriptions.cancel(subscriptionId);
 }
 
 export async function createPortalSession(customerId: string) {
+  const stripe = getBillingStripeClient();
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/billing`,

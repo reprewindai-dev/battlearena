@@ -14,24 +14,31 @@ type Credentials = {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const livekitHealthUrl = process.env.LIVEKIT_HEALTH_URL ?? "http://127.0.0.1:7880/";
+const hasLiveVideoEnv = Boolean(supabaseUrl && serviceRoleKey);
 
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error("LIVE VIDEO E2E requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY");
-}
-
-const adminClient = createClient(supabaseUrl, serviceRoleKey);
+const adminClient = hasLiveVideoEnv
+  ? createClient(supabaseUrl as string, serviceRoleKey as string)
+  : null;
 const createdUserIds: string[] = [];
 const createdBattleIds: string[] = [];
+
+function requireAdminClient() {
+  if (!adminClient) {
+    throw new Error("live_video_env_missing");
+  }
+  return adminClient;
+}
 
 function randomSuffix() {
   return `${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 }
 
 async function createVerifiedUser(prefix: string): Promise<Credentials> {
+  const client = requireAdminClient();
   const email = `${prefix}_${randomSuffix()}@battlearena-e2e.local`;
   const password = `E2E_${randomSuffix()}_Strong!`;
 
-  const { data, error } = await adminClient.auth.admin.createUser({
+  const { data, error } = await client.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
@@ -54,6 +61,8 @@ async function login(page: Page, credentials: Credentials) {
 }
 
 test.afterAll(async () => {
+  if (!adminClient) return;
+
   if (createdBattleIds.length > 0) {
     await adminClient.from("battle_participants").delete().in("battle_id", createdBattleIds);
     await adminClient.from("battles").delete().in("id", createdBattleIds);
@@ -70,6 +79,7 @@ test.afterAll(async () => {
 
 test("two authenticated users can publish and observe live video state", async ({ browser }) => {
   test.setTimeout(180_000);
+  test.skip(!hasLiveVideoEnv, "Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
 
   try {
     const health = await fetch(livekitHealthUrl);

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+type UserRow = { id: string; username: string | null };
+type UserProfileRow = { user_id: string; display_name: string | null; avatar_url: string | null };
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Number(searchParams.get("limit") ?? "20"), 50);
@@ -12,16 +15,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let query = supabase
     .from("notifications")
-    .select(`
+    .select(
+      `
       id, type, title, body, link, read_at, created_at, actor_id
-    `, { count: "exact" })
+    `,
+      { count: "exact" },
+    )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -35,7 +43,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Count unread
   const { count: unreadCount } = await supabase
     .from("notifications")
     .select("id", { count: "exact", head: true })
@@ -54,11 +61,17 @@ export async function GET(req: NextRequest) {
   }>;
   const actorIds = Array.from(new Set(rows.map((row) => row.actor_id).filter((id): id is string => Boolean(id))));
   const [{ data: users }, { data: profiles }] = await Promise.all([
-    actorIds.length ? supabase.from("users").select("id,username").in("id", actorIds) : Promise.resolve({ data: [] as Array<{ id: string; username: string | null }> }),
-    actorIds.length ? supabase.from("user_profiles").select("user_id,display_name,avatar_url").in("user_id", actorIds) : Promise.resolve({ data: [] as Array<{ user_id: string; display_name: string | null; avatar_url: string | null }> }),
+    actorIds.length
+      ? supabase.from("users").select("id,username").in("id", actorIds)
+      : Promise.resolve({ data: [] as UserRow[] }),
+    actorIds.length
+      ? supabase.from("user_profiles").select("user_id,display_name,avatar_url").in("user_id", actorIds)
+      : Promise.resolve({ data: [] as UserProfileRow[] }),
   ]);
-  const usersById = new Map((users ?? []).map((row) => [row.id, row]));
-  const profilesById = new Map((profiles ?? []).map((row) => [row.user_id, row]));
+  const usersById = new Map<string, UserRow>(((users ?? []) as UserRow[]).map((row) => [row.id, row]));
+  const profilesById = new Map<string, UserProfileRow>(
+    ((profiles ?? []) as UserProfileRow[]).map((row) => [row.user_id, row]),
+  );
 
   return NextResponse.json({
     notifications: rows.map((row) => {

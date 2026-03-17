@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -39,7 +39,11 @@ export async function GET(req: Request) {
   }
 
   const userIds = Array.from(
-    new Set((rows ?? []).map((r) => r.created_by).filter((id): id is string => Boolean(id))),
+    new Set(
+      (rows ?? [])
+        .map((r: { created_by: string | null }) => r.created_by)
+        .filter((id: string | null): id is string => Boolean(id)),
+    ),
   );
 
   const profilesById = new Map<string, { handle: string | null; display_name: string | null }>();
@@ -70,7 +74,7 @@ export async function GET(req: Request) {
     }
   }
 
-  const messages: ApiMessage[] = (rows ?? []).map((r) => {
+  const messages: ApiMessage[] = (rows ?? []).map((r: any) => {
     const prof = profilesById.get(r.created_by);
     const author = prof?.display_name ?? prof?.handle ?? r.created_by.slice(0, 8);
     const ts = r.created_at ? Date.parse(r.created_at) : Date.now();
@@ -124,3 +128,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, mode: "supabase" });
 }
+

@@ -1276,9 +1276,10 @@ export function BattleRoomCockpit() {
 
       {/* Video Battle UI */}
       {sessionId ? (
-        <VideoBattle
+        <VideoBattleProduction
+          battleId={sessionId}
+          viewerUserId={sessionMeta?.viewer_user_id ?? viewerUserIdFallback ?? ""}
           localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
-          mode={sessionMode ?? "mock"}
           onStreamReady={async (stream) => {
             // Check video session limit before tracking
             const canUseVideo = await checkUsageLimit("video_session");

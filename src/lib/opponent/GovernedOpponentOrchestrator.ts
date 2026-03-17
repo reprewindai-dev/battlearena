@@ -55,10 +55,10 @@ export class GovernedOpponentOrchestrator {
   private fairnessMonitor: FairnessMonitor;
 
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    this.supabase =
+      supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
     this.circuitBreaker = new CircuitBreaker();
     this.telemetryEmitter = new TelemetryEmitter();
     this.fairnessMonitor = new FairnessMonitor();
@@ -264,6 +264,9 @@ export class GovernedOpponentOrchestrator {
   }
 
   private async persistMatchObservability(bundle: OpponentPlanBundle) {
+    if (!this.supabase) {
+      return;
+    }
     try {
       await this.supabase.from('match_opponent_plans').insert({
         match_id: bundle.match_id,
@@ -360,6 +363,23 @@ export class GovernedOpponentOrchestrator {
 
   // Admin dashboard methods
   async getGovernanceStats() {
+    if (!this.supabase) {
+      return {
+        total_plans: 0,
+        tier_distribution: { TIER1: 0, TIER2: 0, FALLBACK: 0, BLOCKED: 0 },
+        persona_distribution: { Aggro: 0, Turtle: 0, Counter: 0, Gambler: 0 },
+        drama_distribution: {
+          close_win: 0,
+          close_loss: 0,
+          comeback: 0,
+          control_win: 0,
+          stomp_rare: 0,
+        },
+        average_latency: 0,
+        average_cost: 0,
+        circuit_breaker_status: this.circuitBreaker.getStatus(),
+      };
+    }
     try {
       const { data } = await this.supabase
         .from('match_opponent_plans')

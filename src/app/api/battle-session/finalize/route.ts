@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -170,10 +170,10 @@ export async function POST(req: Request) {
     rating_deltas: eloData?.elo ?? null,
   };
 
-  // Post activity feed entry for community feed (fire-and-forget — never block finalize)
+  // Post activity feed entry for community feed (fire-and-forget â€” never block finalize)
   try {
     const winnerParticipant = winnerSlot
-      ? (participants ?? []).find((p) => p.slot === winnerSlot)
+      ? (participants ?? []).find((p: any) => p.slot === winnerSlot)
       : null;
     await supabase.from("activity_feed").insert({
       actor_id: winnerParticipant?.id ?? user.id,
@@ -191,8 +191,9 @@ export async function POST(req: Request) {
       },
     });
   } catch {
-    // Non-critical — swallow silently
+    // Non-critical â€” swallow silently
   }
 
   return NextResponse.json({ ok: true, mode: "supabase", battleId, result: enrichedResult, rpc: rpcData, elo: eloData, idempotent: false });
 }
+

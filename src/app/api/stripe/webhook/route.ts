@@ -72,6 +72,7 @@ export async function POST(request: Request) {
       event.type === "customer.subscription.deleted"
     ) {
       const subscription = event.data.object as Stripe.Subscription;
+      const periodEnd = (subscription as unknown as { current_period_end?: number | null }).current_period_end;
       const userId = subscription.metadata.user_id;
       const planId = subscription.metadata.plan_id;
 
@@ -86,8 +87,8 @@ export async function POST(request: Request) {
               active_subscription_plan: planId ?? null,
               active_subscription_status: subscription.status,
               subscription_current_period_end:
-                subscription.current_period_end
-                  ? new Date(subscription.current_period_end * 1000).toISOString()
+                typeof periodEnd === "number"
+                  ? new Date(periodEnd * 1000).toISOString()
                   : null,
               updated_at: new Date().toISOString(),
             },

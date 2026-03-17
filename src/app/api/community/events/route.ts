@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
   }
 
   const events = (data ?? []) as EventRow[];
-  const eventIds = events.map((e) => e.id);
-  const hostIds = Array.from(new Set(events.map((e) => e.host_user_id)));
+  const eventIds = events.map((e: any) => e.id);
+  const hostIds = Array.from(new Set(events.map((e: any) => e.host_user_id)));
 
   const [{ data: hostProfiles }, { data: attendeeRows }, { data: myRows }] = await Promise.all([
     hostIds.length ? supabase.from("users").select("id,username").in("id", hostIds) : Promise.resolve({ data: [] }),
@@ -53,16 +53,16 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] }),
   ]);
 
-  const hostMap = new Map((hostProfiles ?? []).map((p) => [p.id, p]));
+  const hostMap = new Map((hostProfiles ?? []).map((p: any) => [p.id, p]));
   const attendeeCountByEvent = new Map<string, number>();
   for (const row of attendeeRows ?? []) {
     const eventId = (row as { event_id: string }).event_id;
     attendeeCountByEvent.set(eventId, (attendeeCountByEvent.get(eventId) ?? 0) + 1);
   }
-  const myEventSet = new Set((myRows ?? []).map((row) => (row as { event_id: string }).event_id));
+  const myEventSet = new Set((myRows ?? []).map((row: any) => (row as { event_id: string }).event_id));
 
   return NextResponse.json({
-    items: events.map((event) => ({
+    items: events.map((event: any) => ({
       ...event,
       host: hostMap.get(event.host_user_id) ?? null,
       attendee_count: attendeeCountByEvent.get(event.id) ?? 0,
@@ -128,3 +128,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ item: data }, { status: 201 });
 }
+

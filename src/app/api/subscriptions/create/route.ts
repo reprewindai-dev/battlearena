@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { z } from "zod";
 
 import { getSessionUser } from "@/lib/auth/session";
@@ -78,11 +79,13 @@ export async function POST(request: Request) {
       const currentInvoice = typeof currentSubscription.latest_invoice === "string"
         ? null
         : currentSubscription.latest_invoice;
+      const currentInvoiceWithPaymentIntent =
+        currentInvoice as unknown as { payment_intent?: string | Stripe.PaymentIntent | null } | null;
       const currentPaymentIntent =
-        currentInvoice &&
-        typeof currentInvoice.payment_intent !== "string" &&
-        currentInvoice.payment_intent
-          ? currentInvoice.payment_intent
+        currentInvoiceWithPaymentIntent &&
+        typeof currentInvoiceWithPaymentIntent.payment_intent !== "string" &&
+        currentInvoiceWithPaymentIntent.payment_intent
+          ? currentInvoiceWithPaymentIntent.payment_intent
           : null;
 
       return NextResponse.json({
@@ -113,10 +116,16 @@ export async function POST(request: Request) {
     );
 
     const invoice = typeof subscription.latest_invoice === "string" ? null : subscription.latest_invoice;
+    const invoiceWithPaymentIntent =
+      invoice as unknown as { payment_intent?: string | Stripe.PaymentIntent | null } | null;
     const paymentIntent =
-      invoice && typeof invoice.payment_intent !== "string" && invoice.payment_intent
-        ? invoice.payment_intent
+      invoiceWithPaymentIntent &&
+      typeof invoiceWithPaymentIntent.payment_intent !== "string" &&
+      invoiceWithPaymentIntent.payment_intent
+        ? invoiceWithPaymentIntent.payment_intent
         : null;
+
+    const subscriptionPeriodEnd = (subscription as unknown as { current_period_end?: number | null }).current_period_end;
 
     const { error: upsertBillingError } = await adminClient
       .from("user_billing_profiles")
@@ -128,8 +137,8 @@ export async function POST(request: Request) {
           active_subscription_plan: parsed.data.plan_id,
           active_subscription_status: subscription.status,
           subscription_current_period_end:
-            subscription.current_period_end
-              ? new Date(subscription.current_period_end * 1000).toISOString()
+            typeof subscriptionPeriodEnd === "number"
+              ? new Date(subscriptionPeriodEnd * 1000).toISOString()
               : null,
           updated_at: new Date().toISOString(),
         },

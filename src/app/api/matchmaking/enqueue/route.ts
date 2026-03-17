@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import {
+  ensurePublicUser,
+  normalizeQueueMode,
+  readIdempotentMatchmakingResult,
+  runMatchmakingStep,
+  writeIdempotentMatchmakingResult,
+} from "@/lib/matchmaking/server";
 
 export async function POST(request: Request) {
   try {
@@ -30,22 +37,49 @@ export async function POST(request: Request) {
       (typeof body.username === "string" && body.username) ||
       user.email?.split("@")[0];
 
-  const supabase = await createSupabaseServerClient();
+    await ensurePublicUser(adminClient, user, username);
 
-  const idempotencyKey = `enqueue:${user.id}:${resolvedMode}:${Date.now()}`;
-  const { data, error } = await supabase.rpc("matchmake_enqueue", {
-    p_idempotency_key: idempotencyKey,
-    p_mode: resolvedMode,
-  });
+    if (idempotencyKey) {
+      const existing = await readIdempotentMatchmakingResult({
+        adminClient,
+        userId: user.id,
+        key: idempotencyKey,
+        scope,
+      });
+      if (existing) {
+        return NextResponse.json(existing.response, { status: existing.statusCode });
+      }
+    }
 
-  if (error) {
-    return NextResponse.json({ error: "enqueue_failed", details: error.message }, { status: 400 });
+    const result = await runMatchmakingStep({
+      adminClient,
+      userId: user.id,
+      queueType,
+      battleFormat,
+      preferredGenres,
+      leave,
+      idempotencyKey: idempotencyKey || undefined,
+    });
+
+    if (idempotencyKey) {
+      await writeIdempotentMatchmakingResult({
+        adminClient,
+        userId: user.id,
+        key: idempotencyKey,
+        scope,
+        statusCode: 200,
+        response: result,
+      });
+    }
+
+    return NextResponse.json(result);
+  } catch (error: unknown) {
+    return NextResponse.json(
+      {
+        error: "matchmaking_enqueue_failed",
+        details: error instanceof Error ? error.message : "unknown_error",
+      },
+      { status: 500 },
+    );
   }
-
-  const battleId =
-    data && typeof data === "object" && "battle_id" in data ? (data as { battle_id?: string }).battle_id : null;
-  const matched =
-    data && typeof data === "object" && "matched" in data ? Boolean((data as { matched?: unknown }).matched) : false;
-
-  return NextResponse.json({ ok: true, mode: "supabase", matched, battleId, data });
 }

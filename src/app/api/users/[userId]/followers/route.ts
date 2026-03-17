@@ -1,14 +1,20 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ userId: string }> },
-) {
+type FollowRow = {
+  created_at: string;
+  follower_id?: string;
+  following_id?: string;
+};
+type UserRow = { id: string; username: string | null; is_verified: boolean | null };
+type UserProfileRow = { user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null };
+type UserRatingRow = { user_id: string; rating: number | null; tier: string | null };
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
   const { userId } = await params;
   const { searchParams } = new URL(req.url);
-  const type = searchParams.get("type") ?? "followers"; // followers | following
+  const type = searchParams.get("type") ?? "followers";
   const limit = Math.min(Number(searchParams.get("limit") ?? "20"), 100);
   const offset = Number(searchParams.get("offset") ?? "0");
 
@@ -33,27 +39,31 @@ export async function GET(
 
   const targetIds = Array.from(
     new Set(
-      (follows ?? [])
-        .map((row) => (row as Record<string, unknown>)[targetColumn])
-        .filter((id): id is string => typeof id === "string"),
+      ((follows ?? []) as FollowRow[])
+        .map((row) => (targetColumn === "following_id" ? row.following_id : row.follower_id))
+        .filter((id: string | undefined): id is string => typeof id === "string"),
     ),
   );
 
   const [{ data: users }, { data: profiles }, { data: ratings }] = await Promise.all([
     targetIds.length
       ? supabase.from("users").select("id,username,is_verified").in("id", targetIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; username: string | null; is_verified: boolean | null }> }),
+      : Promise.resolve({ data: [] as UserRow[] }),
     targetIds.length
       ? supabase.from("user_profiles").select("user_id,display_name,avatar_url,tier").in("user_id", targetIds)
-      : Promise.resolve({ data: [] as Array<{ user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null }> }),
+      : Promise.resolve({ data: [] as UserProfileRow[] }),
     targetIds.length
       ? supabase.from("user_ratings").select("user_id,rating,tier").in("user_id", targetIds)
-      : Promise.resolve({ data: [] as Array<{ user_id: string; rating: number | null; tier: string | null }> }),
+      : Promise.resolve({ data: [] as UserRatingRow[] }),
   ]);
 
-  const usersById = new Map((users ?? []).map((row) => [row.id, row]));
-  const profilesById = new Map((profiles ?? []).map((row) => [row.user_id, row]));
-  const ratingsById = new Map((ratings ?? []).map((row) => [row.user_id, row]));
+  const usersById = new Map<string, UserRow>(((users ?? []) as UserRow[]).map((row) => [row.id, row]));
+  const profilesById = new Map<string, UserProfileRow>(
+    ((profiles ?? []) as UserProfileRow[]).map((row) => [row.user_id, row]),
+  );
+  const ratingsById = new Map<string, UserRatingRow>(
+    ((ratings ?? []) as UserRatingRow[]).map((row) => [row.user_id, row]),
+  );
 
   const hydratedUsers = targetIds.map((id) => {
     const user = usersById.get(id);

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { stripe } from "@/lib/billing/stripe";
+import { getBillingStripeClient } from "@/lib/billing/stripe";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { headers } from "next/headers";
 
 export async function POST(request: NextRequest) {
+  let stripe: Stripe;
+  try {
+    stripe = getBillingStripeClient();
+  } catch {
+    return NextResponse.json({ error: "stripe_not_configured" }, { status: 500 });
+  }
+
   const body = await request.text();
   const signature = (await headers()).get("stripe-signature");
 
@@ -27,6 +34,17 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient();
+  const getSubscriptionPeriodEnd = (subscription: Stripe.Subscription | null) => {
+    const value = (subscription as unknown as { current_period_end?: number | null })?.current_period_end;
+    return typeof value === "number" ? new Date(value * 1000).toISOString() : null;
+  };
+
+  const getInvoiceSubscriptionId = (invoice: Stripe.Invoice) => {
+    const value = (invoice as unknown as { subscription?: string | { id?: string } | null }).subscription;
+    if (typeof value === "string") return value;
+    if (value && typeof value === "object" && typeof value.id === "string") return value.id;
+    return null;
+  };
 
   try {
     switch (event.type) {
@@ -55,9 +73,7 @@ export async function POST(request: NextRequest) {
             subscription_id: subscriptionId,
             subscription_status: "active",
             subscription_tier: planType,
-            subscription_ends_at: subscription 
-              ? new Date(subscription.current_period_end * 1000).toISOString()
-              : null,
+            subscription_ends_at: getSubscriptionPeriodEnd(subscription),
           })
           .eq("user_id", userId);
 
@@ -76,22 +92,26 @@ export async function POST(request: NextRequest) {
 
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
-        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+        const invoiceSubscriptionId = getInvoiceSubscriptionId(invoice);
+        const subscription = invoiceSubscriptionId
+          ? await stripe.subscriptions.retrieve(invoiceSubscriptionId)
+          : null;
 
         // Update subscription status
         await supabase
           .from("profiles")
           .update({
             subscription_status: "active",
-            subscription_ends_at: new Date(subscription.current_period_end * 1000).toISOString(),
+            subscription_ends_at: getSubscriptionPeriodEnd(subscription),
           })
-          .eq("subscription_id", invoice.subscription);
+          .eq("subscription_id", invoiceSubscriptionId);
 
         break;
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object;
+        const invoice = event.data.object as Stripe.Invoice;
+        const invoiceSubscriptionId = getInvoiceSubscriptionId(invoice);
 
         // Update subscription status
         await supabase
@@ -99,7 +119,7 @@ export async function POST(request: NextRequest) {
           .update({
             subscription_status: "past_due",
           })
-          .eq("subscription_id", invoice.subscription);
+          .eq("subscription_id", invoiceSubscriptionId);
 
         break;
       }

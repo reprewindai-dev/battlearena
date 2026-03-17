@@ -7,6 +7,9 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = configDir;
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: repoRoot,
+  },
   allowedDevOrigins: [
     "127.0.0.1",
     "localhost",

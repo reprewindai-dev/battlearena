@@ -1,6 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
+
+type UserRow = { id: string; username: string | null };
+type UserProfileRow = { user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null };
+type UserRatingRow = { user_id: string; rating: number | null; tier: string | null };
 
 // GET - list my challenges (incoming + outgoing)
 export async function GET(req: NextRequest) {
@@ -51,18 +55,18 @@ export async function GET(req: NextRequest) {
     challenger_id: string;
     challenged_id: string;
   }>;
-  const userIds = Array.from(new Set(rows.flatMap((row) => [row.challenger_id, row.challenged_id])));
+  const userIds = Array.from(new Set(rows.flatMap((row: any) => [row.challenger_id, row.challenged_id])));
   const [{ data: users }, { data: profiles }, { data: ratings }] = await Promise.all([
     userIds.length ? supabase.from("users").select("id,username").in("id", userIds) : Promise.resolve({ data: [] as Array<{ id: string; username: string | null }> }),
     userIds.length ? supabase.from("user_profiles").select("user_id,display_name,avatar_url,tier").in("user_id", userIds) : Promise.resolve({ data: [] as Array<{ user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null }> }),
     userIds.length ? supabase.from("user_ratings").select("user_id,rating,tier").in("user_id", userIds) : Promise.resolve({ data: [] as Array<{ user_id: string; rating: number | null; tier: string | null }> }),
   ]);
 
-  const usersById = new Map((users ?? []).map((row) => [row.id, row]));
-  const profilesById = new Map((profiles ?? []).map((row) => [row.user_id, row]));
-  const ratingsById = new Map((ratings ?? []).map((row) => [row.user_id, row]));
+  const usersById = new Map<string, UserRow>(((users ?? []) as UserRow[]).map((row) => [row.id, row]));
+  const profilesById = new Map<string, UserProfileRow>(((profiles ?? []) as UserProfileRow[]).map((row) => [row.user_id, row]));
+  const ratingsById = new Map<string, UserRatingRow>(((ratings ?? []) as UserRatingRow[]).map((row) => [row.user_id, row]));
 
-  const challenges = rows.map((row) => {
+  const challenges = rows.map((row: any) => {
     const challengerUser = usersById.get(row.challenger_id);
     const challengedUser = usersById.get(row.challenged_id);
     const challengerProfile = profilesById.get(row.challenger_id);
@@ -179,3 +183,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ challenge: data }, { status: 201 });
 }
+

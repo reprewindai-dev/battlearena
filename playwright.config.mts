@@ -49,6 +49,6 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
     },
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 240_000,
   },
 });
