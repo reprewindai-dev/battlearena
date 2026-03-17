@@ -1,17 +1,14 @@
-version: '3.8'
-
 services:
-  # LiveKit Server
   livekit:
     image: livekit/livekit-server:latest
     container_name: battlearena-livekit
     restart: unless-stopped
     ports:
-      - "7880:7880"   # WebSocket port
-      - "7881:7881"   # HTTP port
-      - "50000-50020:50000-50020/udp"  # UDP media ports
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50020:50000-50020/udp"
     environment:
-      - LIVEKIT_KEYS=devkey:devsecret
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
       - LIVEKIT_REDIS_ADDRESS=redis:6379
       - LIVEKIT_TURN_SERVERS=turn:turnserver:3478
     depends_on:
@@ -20,65 +17,30 @@ services:
     networks:
       - battlearena-network
 
-  # Redis for LiveKit
   redis:
     image: redis:7-alpine
-    container_name: battlearena-redis
+    container_name: battlearena-livekit-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
-      - redis_data:/data
+      - livekit_redis_data:/data
     networks:
       - battlearena-network
 
-  # Coturn TURN Server
   turnserver:
     image: coturn/coturn:latest
     container_name: battlearena-turnserver
     restart: unless-stopped
     ports:
-      - "3478:3478/udp"   # STUN/TURN UDP
-      - "3478:3478/tcp"   # STUN/TURN TCP
-      - "49152-65535:49152-65535/udp"  # TURN relay ports
-    environment:
-      - TURN_USERNAME=battlearena
-      - TURN_PASSWORD=battlearena-turn-secret
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49152-49200:49152-49200/udp"
     volumes:
       - ./volumes/turnserver/turnserver.conf:/etc/coturn/turnserver.conf
     networks:
       - battlearena-network
 
-  # Recording Service
-  recording-service:
-    build:
-      context: ./services/recording
-      dockerfile: Dockerfile
-    container_name: battlearena-recording
-    restart: unless-stopped
-    environment:
-      - LIVEKIT_URL=http://livekit:7880
-      - LIVEKIT_API_KEY=devkey
-      - LIVEKIT_API_SECRET=devsecret
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-    depends_on:
-      - livekit
-      - postgres
-    networks:
-      - battlearena-network
-
-  # PostgreSQL (existing)
-  postgres:
-    extends:
-      file: docker-compose.yml
-      service: postgres
-    networks:
-      - battlearena-network
-
 volumes:
-  redis_data:
+  livekit_redis_data:
 
 networks:
   battlearena-network:

@@ -1,9 +1,12 @@
-import { CommunityFeed } from "@/components/community/CommunityFeed";
+﻿import { CommunityFeed } from "@/components/community/CommunityFeed";
 import { CommunityStats } from "@/components/community/CommunityStats";
 import { Leaderboard } from "@/components/community/Leaderboard";
+import { CommunityCrews } from "@/components/community/CommunityCrews";
+import { CommunityMentorships } from "@/components/community/CommunityMentorships";
+import { CommunityEvents } from "@/components/community/CommunityEvents";
 import { Separator } from "@/components/ui/separator";
 
-export const metadata = { title: "Community – Battle Arena" };
+export const metadata = { title: "Community - Battle Arena" };
 
 export default function CommunityPage() {
   return (
@@ -27,6 +30,15 @@ export default function CommunityPage() {
           <Leaderboard />
         </div>
       </div>
+
+      <Separator />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <CommunityCrews />
+        <CommunityMentorships />
+        <CommunityEvents />
+      </div>
     </div>
   );
 }
+

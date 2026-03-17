@@ -83,7 +83,7 @@ export function ChallengeModal({
             Challenge {target?.display_name ?? target?.handle}
           </DialogTitle>
           <DialogDescription>
-            @{target?.handle} · ELO {target?.elo_rating} · {target?.tier?.toUpperCase()}
+            @{target?.handle} - ELO {target?.elo_rating} - {target?.tier?.toUpperCase()}
           </DialogDescription>
         </DialogHeader>
 
@@ -119,7 +119,7 @@ export function ChallengeModal({
           <div className="space-y-2">
             <Label>Message (optional)</Label>
             <Textarea
-              placeholder="Trash talk or respect — your choice."
+              placeholder="Trash talk or respect - your choice."
               maxLength={280}
               rows={3}
               value={message}
@@ -130,7 +130,7 @@ export function ChallengeModal({
 
           <div className="flex gap-2">
             <Button className="flex-1" onClick={handleSubmit} disabled={loading}>
-              {loading ? "Sending…" : "Send Challenge"}
+              {loading ? "Sending..." : "Send Challenge"}
             </Button>
             <Button variant="outline" onClick={onClose}>Cancel</Button>
           </div>
@@ -139,3 +139,4 @@ export function ChallengeModal({
     </Dialog>
   );
 }
+

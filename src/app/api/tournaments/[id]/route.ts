@@ -26,29 +26,60 @@ export async function GET(
     .select(`
       id,
       status,
-      seed,
-      final_placement,
+      seed_number,
       registered_at,
-      user_profiles (
-        id,
-        handle,
-        display_name,
-        avatar_url,
-        elo_rating,
-        tier
-      )
+      user_id
     `)
     .eq("tournament_id", id)
-    .order("seed", { ascending: true, nullsFirst: false });
+    .order("seed_number", { ascending: true, nullsFirst: false });
 
-  // Count confirmed participants
-  const participant_count = (participants ?? []).filter(
+  const participantRows = (participants ?? []) as Array<{
+    id: string;
+    status: string;
+    seed_number: number | null;
+    registered_at: string;
+    user_id: string;
+  }>;
+  const userIds = Array.from(new Set(participantRows.map((p) => p.user_id)));
+  const [{ data: users }, { data: profiles }, { data: ratings }] = await Promise.all([
+    userIds.length ? supabase.from("users").select("id,username").in("id", userIds) : Promise.resolve({ data: [] as Array<{ id: string; username: string | null }> }),
+    userIds.length ? supabase.from("user_profiles").select("user_id,display_name,avatar_url,tier").in("user_id", userIds) : Promise.resolve({ data: [] as Array<{ user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null }> }),
+    userIds.length ? supabase.from("user_ratings").select("user_id,rating,tier").in("user_id", userIds) : Promise.resolve({ data: [] as Array<{ user_id: string; rating: number | null; tier: string | null }> }),
+  ]);
+  const usersById = new Map((users ?? []).map((u) => [u.id, u]));
+  const profilesById = new Map((profiles ?? []).map((u) => [u.user_id, u]));
+  const ratingsById = new Map((ratings ?? []).map((u) => [u.user_id, u]));
+
+  const hydratedParticipants = participantRows.map((p) => {
+    const user = usersById.get(p.user_id);
+    const profile = profilesById.get(p.user_id);
+    const rating = ratingsById.get(p.user_id);
+    return {
+      id: p.id,
+      status: p.status,
+      seed: p.seed_number,
+      final_placement: null,
+      registered_at: p.registered_at,
+      user_profiles: [
+        {
+          id: p.user_id,
+          handle: user?.username ?? p.user_id.slice(0, 8),
+          display_name: profile?.display_name ?? null,
+          avatar_url: profile?.avatar_url ?? null,
+          elo_rating: rating?.rating ?? 1000,
+          tier: rating?.tier ?? profile?.tier ?? "bronze",
+        },
+      ],
+    };
+  });
+
+  const participant_count = hydratedParticipants.filter(
     (p) => p.status === "confirmed" || p.status === "registered"
   ).length;
 
   return NextResponse.json({
     tournament: { ...tournament, participant_count },
-    participants: participants ?? [],
+    participants: hydratedParticipants,
   });
 }
 
@@ -68,7 +99,7 @@ export async function PATCH(
   if (role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const allowed = ["status", "name", "description", "registration_deadline", "starts_at", "bracket_data"];
+  const allowed = ["status", "name", "description", "registration_closes", "starts_at", "prize_structure", "ends_at"];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) updates[key] = body[key];

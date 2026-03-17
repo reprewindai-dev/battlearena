@@ -36,122 +36,146 @@ const PremiumMobileHomePage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [likedBattles, setLikedBattles] = useState<Set<string>>(new Set());
   const [likedBeats, setLikedBeats] = useState<Set<string>>(new Set());
+  const [featuredBattles, setFeaturedBattles] = useState<Array<{
+    id: string;
+    title: string;
+    room_code: string;
+    battle_type: 'ranked' | 'casual' | 'tournament';
+    format: '30s' | '60s' | '90s';
+    entry_fee_tokens: number;
+    status: 'waiting' | 'active' | 'completed';
+    current_participants: number;
+    max_participants: number;
+    viewers: number;
+  }>>([]);
+  const [trendingBeats, setTrendingBeats] = useState<Array<{
+    id: string;
+    title: string;
+    artist: string;
+    tempo: number;
+    genre: string;
+    duration_seconds: number;
+    preview_url: string;
+    usage_count: number;
+  }>>([]);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<Array<{
+    id: string;
+    rank: number;
+    handle?: string | null;
+    display_name?: string | null;
+    wins?: number;
+    elo_rating?: number;
+  }>>([]);
+  const [homeStats, setHomeStats] = useState({
+    activeBattles: 0,
+    beatsInLibrary: 0,
+    activeBattlers: 0,
+    topRating: 0,
+  });
 
-  // Mock data for demonstration
-  const featuredBattles = [
-    {
-      id: '1',
-      title: 'Trap God Challenge',
-      room_code: 'TRAP001',
-      battle_type: 'ranked' as const,
-      format: '60s' as const,
-      entry_fee_tokens: 100,
-      status: 'active' as const,
-      current_participants: 2,
-      max_participants: 2,
-      viewers: 1234,
-    },
-    {
-      id: '2',
-      title: 'Drill Lord Battle',
-      room_code: 'DRILL002',
-      battle_type: 'casual' as const,
-      format: '30s' as const,
-      entry_fee_tokens: 0,
-      status: 'waiting' as const,
-      current_participants: 1,
-      max_participants: 2,
-      viewers: 567,
-    },
-    {
-      id: '3',
-      title: 'Underground Cypher',
-      room_code: 'UND003',
-      battle_type: 'tournament' as const,
-      format: '90s' as const,
-      entry_fee_tokens: 500,
-      status: 'active' as const,
-      current_participants: 2,
-      max_participants: 2,
-      viewers: 2890,
-    },
-  ];
+  useEffect(() => {
+    let cancelled = false;
 
-  const trendingBeats = [
-    {
-      id: '1',
-      title: 'Neon Dreams',
-      artist: 'Arena Producer',
-      tempo: 92,
-      genre: 'hip-hop',
-      duration_seconds: 32,
-      preview_url: 'https://storage.googleapis.com/arena-beats/previews/neon-dreams.mp3',
-      usage_count: 1234,
-    },
-    {
-      id: '2',
-      title: 'Glass City',
-      artist: 'Arena Producer',
-      tempo: 104,
-      genre: 'hip-hop',
-      duration_seconds: 28,
-      preview_url: 'https://storage.googleapis.com/arena-beats/previews/glass-city.mp3',
-      usage_count: 987,
-    },
-    {
-      id: '3',
-      title: 'Ion Runner',
-      artist: 'Arena Producer',
-      tempo: 120,
-      genre: 'electronic',
-      duration_seconds: 24,
-      preview_url: 'https://storage.googleapis.com/arena-beats/previews/ion-runner.mp3',
-      usage_count: 756,
-    },
-    {
-      id: '4',
-      title: 'Midnight Groove',
-      artist: 'Arena Producer',
-      tempo: 88,
-      genre: 'hip-hop',
-      duration_seconds: 36,
-      preview_url: 'https://storage.googleapis.com/arena-beats/previews/midnight-groove.mp3',
-      usage_count: 543,
-    },
-  ];
+    async function loadHomeData() {
+      const [battlesRes, beatsRes, leaderboardRes] = await Promise.all([
+        fetch('/api/battles?limit=6'),
+        fetch('/api/beats?limit=8&sort_by=usage_count&sort_order=desc'),
+        fetch('/api/community/leaderboard?limit=3'),
+      ]);
+
+      const [battlesBody, beatsBody, leaderboardBody] = await Promise.all([
+        battlesRes.json().catch(() => ({})),
+        beatsRes.json().catch(() => ({})),
+        leaderboardRes.json().catch(() => ({})),
+      ]);
+
+      if (cancelled) return;
+
+      const battles = battlesRes.ok && Array.isArray(battlesBody?.battles) ? battlesBody.battles : [];
+      const beats = beatsRes.ok && Array.isArray(beatsBody?.beats) ? beatsBody.beats : [];
+      const entries = leaderboardRes.ok && Array.isArray(leaderboardBody?.entries) ? leaderboardBody.entries : [];
+
+      setFeaturedBattles(
+        battles.map((battle: any) => ({
+          id: String(battle.id),
+          title: typeof battle.title === 'string' ? battle.title : `Battle ${String(battle.room_code ?? '').slice(0, 6)}`,
+          room_code: String(battle.room_code ?? '').slice(0, 10),
+          battle_type: battle.battle_type === 'ranked' || battle.battle_type === 'tournament' ? battle.battle_type : 'casual',
+          format: battle.format === '30s' || battle.format === '90s' ? battle.format : '60s',
+          entry_fee_tokens: Number(battle.entry_fee_tokens ?? 0),
+          status: battle.status === 'active' || battle.status === 'completed' ? battle.status : 'waiting',
+          current_participants: Number(battle.current_participants ?? 0),
+          max_participants: Number(battle.max_participants ?? 2),
+          viewers: Number(battle.viewers ?? 0),
+        })),
+      );
+
+      setTrendingBeats(
+        beats.map((beat: any) => ({
+          id: String(beat.id),
+          title: String(beat.title ?? 'Untitled Beat'),
+          artist: String(beat.artist ?? 'Unknown Artist'),
+          tempo: Number(beat.tempo ?? 0),
+          genre: String(beat.genre ?? 'unknown'),
+          duration_seconds: Number(beat.duration_seconds ?? 0),
+          preview_url: String(beat.preview_url ?? ''),
+          usage_count: Number(beat.usage_count ?? 0),
+        })),
+      );
+
+      setLeaderboardEntries(
+        entries.map((entry: any, idx: number) => ({
+          id: String(entry.id ?? `entry-${idx}`),
+          rank: Number(entry.rank ?? idx + 1),
+          handle: typeof entry.handle === 'string' ? entry.handle : null,
+          display_name: typeof entry.display_name === 'string' ? entry.display_name : null,
+          wins: Number(entry.wins ?? 0),
+          elo_rating: Number(entry.elo_rating ?? 0),
+        })),
+      );
+
+      setHomeStats({
+        activeBattles: battles.length,
+        beatsInLibrary: beats.length,
+        activeBattlers: entries.length,
+        topRating: entries.length > 0 ? Number(entries[0].elo_rating ?? 0) : 0,
+      });
+    }
+
+    void loadHomeData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const stats = [
     {
       title: 'Active Battles',
-      value: '50K+',
-      subtitle: 'Happening now',
+      value: String(homeStats.activeBattles),
+      subtitle: 'Live + queued',
       icon: <Swords className="w-5 h-5" />,
       color: 'orange' as const,
-      trend: '+12%',
     },
     {
       title: 'Beats',
-      value: '100K+',
-      subtitle: 'In library',
+      value: String(homeStats.beatsInLibrary),
+      subtitle: 'Loaded now',
       icon: <Mic className="w-5 h-5" />,
       color: 'purple' as const,
-      trend: '+8%',
     },
     {
-      title: 'Battlers',
-      value: '25K+',
-      subtitle: 'Active users',
+      title: 'Top Battlers',
+      value: String(homeStats.activeBattlers),
+      subtitle: 'Leaderboard sample',
       icon: <Users className="w-5 h-5" />,
       color: 'pink' as const,
-      trend: '+15%',
     },
     {
-      title: 'Prizes',
-      value: '$1M+',
-      subtitle: 'Won this month',
+      title: 'Top ELO',
+      value: String(homeStats.topRating || 0),
+      subtitle: 'Current #1',
       icon: <Trophy className="w-5 h-5" />,
       color: 'yellow' as const,
-      trend: '+20%',
     },
   ];
 
@@ -309,11 +333,7 @@ const PremiumMobileHomePage: React.FC = () => {
           <Card className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border-yellow-500/20 backdrop-blur-sm rounded-xl">
             <CardContent className="p-4">
               <div className="space-y-3">
-                {[
-                  { rank: 1, name: 'TrapKing', wins: 142, points: 2840 },
-                  { rank: 2, name: 'DrillLord', wins: 128, points: 2560 },
-                  { rank: 3, name: 'CypherMaster', wins: 115, points: 2300 },
-                ].map((player) => (
+                {leaderboardEntries.map((player) => (
                   <div key={player.rank} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
@@ -324,16 +344,19 @@ const PremiumMobileHomePage: React.FC = () => {
                         {player.rank}
                       </div>
                       <div>
-                        <p className="text-white font-bold text-sm">{player.name}</p>
-                        <p className="text-white/60 text-xs">{player.wins} wins</p>
+                        <p className="text-white font-bold text-sm">{player.display_name || player.handle || 'Unknown'}</p>
+                        <p className="text-white/60 text-xs">{player.wins ?? 0} wins</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-yellow-400 font-bold text-sm">{player.points}</p>
-                      <p className="text-white/60 text-xs">points</p>
+                      <p className="text-yellow-400 font-bold text-sm">{player.elo_rating ?? 0}</p>
+                      <p className="text-white/60 text-xs">ELO</p>
                     </div>
                   </div>
                 ))}
+                {leaderboardEntries.length === 0 ? (
+                  <div className="text-white/60 text-sm">No leaderboard entries available.</div>
+                ) : null}
               </div>
             </CardContent>
           </Card>

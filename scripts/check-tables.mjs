@@ -1,39 +1,44 @@
-import pg from 'pg';
+import pg from "pg";
+import { config } from "dotenv";
+
+config({ path: ".env.local" });
+config({ path: ".env.production" });
+config();
 
 const { Client } = pg;
 
 async function checkTables() {
+  const connectionString = process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("Missing SUPABASE_DB_URL or DATABASE_URL");
+  }
+
   const client = new Client({
-    host: 'aws-1-us-east-1.pooler.supabase.com',
-    port: 6543,
-    database: 'postgres',
-    user: 'postgres.xjnxrkdtdfvusofiwshu',
-    password: 'kys48wlXoYWDbOEL',
+    connectionString,
     ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 5000
+    connectionTimeoutMillis: 5000,
   });
 
   try {
     await client.connect();
-    console.log('🔍 Checking database tables...');
-    
+    console.log("Checking database tables...");
+
     const result = await client.query(`
-      SELECT table_name, table_schema 
-      FROM information_schema.tables 
-      WHERE table_schema IN ('public', 'auth') 
-      ORDER BY table_schema, table_name
+      select table_schema, table_name
+      from information_schema.tables
+      where table_schema = 'public'
+      order by table_name;
     `);
-    
-    console.log('📋 Tables found:');
-    result.rows.forEach(row => {
+
+    for (const row of result.rows) {
       console.log(`  ${row.table_schema}.${row.table_name}`);
-    });
-    
+    }
+  } finally {
     await client.end();
-  } catch (err) {
-    console.error('❌ Check failed:', err.message);
-    process.exit(1);
   }
 }
 
-checkTables();
+checkTables().catch((error) => {
+  console.error(`check_failed:${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});

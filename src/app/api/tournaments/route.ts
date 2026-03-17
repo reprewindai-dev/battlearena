@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -15,9 +16,9 @@ export async function GET(req: NextRequest) {
   let query = supabase
     .from("tournaments")
     .select(`
-      id, name, description, status, format, max_participants,
-      entry_fee_tokens, prize_pool_tokens, starts_at, registration_ends_at, created_at,
-      creator:user_profiles!created_by (id, handle, display_name, avatar_url),
+      id, name, description, status, format, max_participants, tournament_type,
+      entry_fee_tokens, prize_pool_tokens, starts_at, registration_closes, registration_opens, created_at,
+      created_by,
       participant_count:tournament_participants(count)
     `, { count: "exact" })
     .order("starts_at", { ascending: true })
@@ -34,7 +35,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ tournaments: data ?? [], total: count ?? 0 });
+  const rows = (data ?? []) as Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    status: string;
+    format: string;
+    max_participants: number;
+    tournament_type: string | null;
+    entry_fee_tokens: number;
+    prize_pool_tokens: number;
+    starts_at: string | null;
+    registration_closes: string | null;
+    registration_opens: string | null;
+    created_at: string;
+    created_by: string | null;
+    participant_count: Array<{ count: number }>;
+  }>;
+
+  return NextResponse.json({
+    tournaments: rows.map((row) => ({
+      ...row,
+      registration_ends_at: row.registration_closes,
+    })),
+    total: count ?? 0,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -47,16 +72,15 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  try {
+    await ensurePublicUserRecord(supabase, user);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
+  }
 
-  // Check admin role
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+  const role = (user.app_metadata as { role?: string } | undefined)?.role ?? "user";
+  if (role !== "admin" && role !== "mod") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();
@@ -64,6 +88,7 @@ export async function POST(req: NextRequest) {
     name,
     description,
     format = "single_elimination",
+    tournament_type = "open",
     max_participants = 16,
     entry_fee_tokens = 0,
     prize_pool_tokens = 0,
@@ -81,11 +106,13 @@ export async function POST(req: NextRequest) {
       name: String(name).slice(0, 100),
       description: description ? String(description).slice(0, 500) : null,
       format,
+      tournament_type,
       max_participants: Number(max_participants),
       entry_fee_tokens: Number(entry_fee_tokens),
       prize_pool_tokens: Number(prize_pool_tokens),
       starts_at,
-      registration_ends_at,
+      registration_closes: registration_ends_at,
+      registration_opens: new Date().toISOString(),
       created_by: user.id,
     })
     .select()

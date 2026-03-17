@@ -1,7 +1,6 @@
-import { TournamentList } from "@/components/community/TournamentList";
-import { CommunityStats } from "@/components/community/CommunityStats";
+﻿import { TournamentList } from "@/components/community/TournamentList";
 
-export const metadata = { title: "Tournaments – Battle Arena" };
+export const metadata = { title: "Tournaments - Battle Arena" };
 
 export default function TournamentsPage() {
   return (
@@ -17,3 +16,4 @@ export default function TournamentsPage() {
     </div>
   );
 }
+

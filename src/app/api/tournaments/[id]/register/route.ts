@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 export async function POST(
   _req: NextRequest,
@@ -14,6 +15,11 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    await ensurePublicUserRecord(supabase, user);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
   }
 
   const { data: tournament, error: tErr } = await supabase
@@ -30,7 +36,7 @@ export async function POST(
     return NextResponse.json({ error: "Registration is closed" }, { status: 400 });
   }
 
-  if (new Date(tournament.registration_ends_at) < new Date()) {
+  if (new Date(tournament.registration_closes) < new Date()) {
     return NextResponse.json({ error: "Registration deadline passed" }, { status: 400 });
   }
 
@@ -46,25 +52,38 @@ export async function POST(
 
   // Deduct entry fee if applicable
   if (tournament.entry_fee_tokens > 0) {
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("token_balance")
-      .eq("id", user.id)
-      .single();
+    const { data: wallet } = await supabase
+      .from("wallets")
+      .select("crowns_balance")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    if (!profile || profile.token_balance < tournament.entry_fee_tokens) {
+    const balance = wallet?.crowns_balance ?? 0;
+    if (balance < tournament.entry_fee_tokens) {
       return NextResponse.json({ error: "Insufficient tokens" }, { status: 400 });
     }
 
     await supabase
-      .from("user_profiles")
-      .update({ token_balance: profile.token_balance - tournament.entry_fee_tokens })
-      .eq("id", user.id);
+      .from("wallets")
+      .upsert(
+        { user_id: user.id, crowns_balance: balance - tournament.entry_fee_tokens },
+        { onConflict: "user_id" },
+      );
+
+    await supabase.from("token_transactions").insert({
+      user_id: user.id,
+      recipient_id: tournament.created_by,
+      tokens_spent: tournament.entry_fee_tokens,
+      points_earned: 0,
+      platform_share: 0,
+      transaction_type: "tournament_entry_fee",
+      reference_id: id,
+    });
   }
 
   const { data, error } = await supabase
     .from("tournament_participants")
-    .insert({ tournament_id: id, user_id: user.id })
+    .insert({ tournament_id: id, user_id: user.id, status: "registered" })
     .select()
     .single();
 

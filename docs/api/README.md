@@ -20,6 +20,51 @@ Authorization: Bearer <jwt_token>
 
 ## Core Endpoints
 
+### Battle Runtime (Canonical)
+
+- Canonical live battle runtime route: `/app/battles/room`
+- Legacy `/app/battles/pvp` is deprecated and redirects to `/app/battles/room`.
+- Live battle APIs are real-runtime only (no mock auth/runtime in production battle paths).
+
+#### GET /api/livekit/token
+Requires authenticated session and room-scoped authorization.
+
+Query:
+- `room` (battle id)
+- `participant` (must match authenticated user id)
+
+Response:
+```json
+{
+  "token": "jwt",
+  "url": "ws://... or wss://...",
+  "room": "battle_uuid",
+  "participant": "user_uuid",
+  "role": "participant|spectator"
+}
+```
+
+#### POST /api/matchmaking/enqueue
+Server-authoritative matchmaking enqueue/dequeue endpoint.
+
+Response contract:
+```json
+{
+  "ok": true,
+  "mode": "freestyle|ranked|tournament",
+  "status": "queued|matched|none",
+  "matched": true,
+  "battleId": "uuid",
+  "isBotBattle": false,
+  "fallbackReason": "none|timed_bot_fallback",
+  "waitTimeMs": 0,
+  "queueType": "freestyle|ranked|tournament"
+}
+```
+
+#### GET /api/matchmaking/status
+Returns normalized queue status with the same contract fields used by enqueue.
+
 ### Authentication Service
 
 #### POST /auth/register

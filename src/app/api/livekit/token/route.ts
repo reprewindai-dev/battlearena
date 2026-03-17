@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 function getRole(user: { isParticipant: boolean }): "participant" | "spectator" {
   if (user.isParticipant) return "participant";
@@ -11,10 +12,10 @@ function getRole(user: { isParticipant: boolean }): "participant" | "spectator" 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const room = searchParams.get("room");
-  const participant = searchParams.get("participant");
+  const requestedParticipant = searchParams.get("participant");
 
-  if (!room || !participant) {
-    return NextResponse.json({ error: "room_and_participant_required" }, { status: 400 });
+  if (!room) {
+    return NextResponse.json({ error: "room_required" }, { status: 400 });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -31,11 +32,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  if (participant !== user.id) {
-    return NextResponse.json({ error: "participant_must_match_authenticated_user" }, { status: 403 });
+  // Participant identity is always bound to authenticated user to prevent token spoofing.
+  const participant = user.id;
+
+  let adminClient: ReturnType<typeof createSupabaseServiceRoleClient>;
+  try {
+    adminClient = createSupabaseServiceRoleClient();
+  } catch {
+    return NextResponse.json({ error: "service_role_not_configured" }, { status: 500 });
   }
 
-  const { data: battle, error: battleError } = await supabase
+  const { data: battle, error: battleError } = await adminClient
     .from("battles")
     .select("id,created_by,status")
     .eq("id", room)
@@ -49,7 +56,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "battle_not_found" }, { status: 404 });
   }
 
-  const { data: participantRow } = await supabase
+  const { data: participantRow } = await adminClient
     .from("battle_participants")
     .select("id")
     .eq("battle_id", room)
@@ -76,6 +83,7 @@ export async function GET(request: NextRequest) {
       metadata: JSON.stringify({
         battleId: room,
         role: viewerRole,
+        requestedParticipant: requestedParticipant ?? null,
       }),
     });
 
@@ -86,9 +94,10 @@ export async function GET(request: NextRequest) {
       canPublish: viewerRole === "participant",
       canPublishData: viewerRole === "participant",
     });
+    const jwt = await token.toJwt();
 
     return NextResponse.json({
-      token: token.toJwt(),
+      token: jwt,
       url: livekitUrl,
       room,
       participant,

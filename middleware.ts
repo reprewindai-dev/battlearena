@@ -1,23 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const protectedPrefixes = ["/app"];
+import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const { response: supabaseResponse, user } = await updateSupabaseSession(req);
 
-  // Allow mock session (Playwright helper)
-  const mockSession = req.cookies.get("arena_mock_session")?.value === "1";
-  const supabaseAuthCookie = req.cookies.get("sb-access-token") || req.cookies.get("sb:token");
-
-  if (pathname.startsWith("/app") && !mockSession && !supabaseAuthCookie) {
+  if (pathname.startsWith("/app") && !user) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
+  
+  const roleClaim = user
+    ? ((user.app_metadata as { role?: unknown } | undefined)?.role ??
+      (user.user_metadata as { role?: unknown } | undefined)?.role)
+    : null;
+  const role = roleClaim === "admin" || roleClaim === "mod" || roleClaim === "user" ? roleClaim : "user";
 
   if (pathname.startsWith("/app/admin")) {
-    const role = req.cookies.get("arena_role")?.value;
     if (role !== "admin") {
       const url = req.nextUrl.clone();
       url.pathname = "/app";
@@ -26,7 +28,6 @@ export function middleware(req: NextRequest) {
   }
 
   if (pathname.startsWith("/app/moderation")) {
-    const role = req.cookies.get("arena_role")?.value;
     if (role !== "admin" && role !== "mod") {
       const url = req.nextUrl.clone();
       url.pathname = "/app";
@@ -34,7 +35,7 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {

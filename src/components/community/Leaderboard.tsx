@@ -1,9 +1,7 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Crown, TrendingUp, Shield } from "lucide-react";
@@ -39,9 +37,9 @@ const TIER_ICONS: Record<string, React.ReactNode> = {
 };
 
 function RankBadge({ rank }: { rank: number }) {
-  if (rank === 1) return <span className="text-lg">🥇</span>;
-  if (rank === 2) return <span className="text-lg">🥈</span>;
-  if (rank === 3) return <span className="text-lg">🥉</span>;
+  if (rank === 1) return <span className="w-6 text-center text-sm font-semibold text-yellow-400">#1</span>;
+  if (rank === 2) return <span className="w-6 text-center text-sm font-semibold text-slate-300">#2</span>;
+  if (rank === 3) return <span className="w-6 text-center text-sm font-semibold text-amber-500">#3</span>;
   return <span className="w-6 text-center text-sm font-mono text-muted-foreground">{rank}</span>;
 }
 
@@ -131,7 +129,7 @@ export function Leaderboard() {
                         {entry.display_name ?? entry.handle}
                       </Link>
                       {TIER_ICONS[entry.tier]}
-                      {entry.is_verified && <span className="text-xs text-blue-400">✓</span>}
+                      {entry.is_verified && <span className="text-xs text-blue-400">Verified</span>}
                     </div>
                     <span className={`text-xs ${TIER_COLORS[entry.tier] ?? "text-muted-foreground"}`}>
                       {entry.tier.toUpperCase()}
@@ -153,3 +151,5 @@ export function Leaderboard() {
     </div>
   );
 }
+
+

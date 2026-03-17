@@ -1,12 +1,13 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Trophy, Users, Zap, Calendar, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { Calendar, Clock, Trophy, Users, Zap } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 type Tournament = {
   id: string;
@@ -35,13 +36,17 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
   const [registering, setRegistering] = React.useState(false);
   const participantCount = tournament.participant_count?.[0]?.count ?? 0;
   const isFull = participantCount >= tournament.max_participants;
-  const regOpen = tournament.status === "registration" && new Date(tournament.registration_ends_at) > new Date();
+  const regOpen =
+    tournament.status === "registration" &&
+    new Date(tournament.registration_ends_at) > new Date();
 
   async function handleRegister() {
     setRegistering(true);
     try {
-      const res = await fetch(`/api/tournaments/${tournament.id}/register`, { method: "POST" });
-      const json = await res.json();
+      const res = await fetch(`/api/tournaments/${tournament.id}/register`, {
+        method: "POST",
+      });
+      const json = (await res.json()) as { error?: string };
       if (!res.ok) {
         toast.error(json.error ?? "Registration failed");
         return;
@@ -59,17 +64,27 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-yellow-400 shrink-0" />
-            <Link href={`/app/tournaments/${tournament.id}`} className="font-semibold truncate hover:underline">
+            <Trophy className="h-4 w-4 shrink-0 text-yellow-400" />
+            <Link
+              href={`/app/tournaments/${tournament.id}`}
+              className="truncate font-semibold hover:underline"
+            >
               {tournament.name}
             </Link>
           </div>
-          {tournament.description && (
-            <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{tournament.description}</p>
-          )}
+          {tournament.description ? (
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {tournament.description}
+            </p>
+          ) : null}
         </div>
-        <Badge variant="outline" className={`shrink-0 text-xs ${STATUS_COLORS[tournament.status] ?? ""}`}>
-          {tournament.status === "live" ? "🔴 LIVE" : tournament.status.replace("_", " ").toUpperCase()}
+        <Badge
+          variant="outline"
+          className={`shrink-0 text-xs ${STATUS_COLORS[tournament.status] ?? ""}`}
+        >
+          {tournament.status === "live"
+            ? "LIVE"
+            : tournament.status.replace("_", " ").toUpperCase()}
         </Badge>
       </div>
 
@@ -87,7 +102,9 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
             <Zap className="h-3 w-3" /> Entry
           </div>
           <div className="font-medium">
-            {tournament.entry_fee_tokens === 0 ? "Free" : `${tournament.entry_fee_tokens} tokens`}
+            {tournament.entry_fee_tokens === 0
+              ? "Free"
+              : `${tournament.entry_fee_tokens} tokens`}
           </div>
         </div>
         <div className="space-y-0.5">
@@ -95,7 +112,9 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
             <Trophy className="h-3 w-3" /> Prize
           </div>
           <div className="font-medium text-yellow-400">
-            {tournament.prize_pool_tokens === 0 ? "—" : `${tournament.prize_pool_tokens} tokens`}
+            {tournament.prize_pool_tokens === 0
+              ? "-"
+              : `${tournament.prize_pool_tokens} tokens`}
           </div>
         </div>
         <div className="space-y-0.5">
@@ -108,7 +127,7 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
         </div>
       </div>
 
-      {regOpen && (
+      {regOpen ? (
         <div className="mt-4 flex items-center gap-2">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
@@ -120,26 +139,26 @@ function TournamentCard({ tournament }: { tournament: Tournament }) {
             onClick={handleRegister}
             disabled={registering || isFull}
           >
-            {registering ? "Registering…" : isFull ? "Full" : "Register"}
+            {registering ? "Registering..." : isFull ? "Full" : "Register"}
           </Button>
         </div>
-      )}
+      ) : null}
 
-      {tournament.status === "live" && (
+      {tournament.status === "live" ? (
         <div className="mt-4">
           <Button asChild size="sm" variant="destructive" className="w-full">
             <Link href={`/app/tournaments/${tournament.id}`}>Watch Live</Link>
           </Button>
         </div>
-      )}
+      ) : null}
 
-      {tournament.status !== "live" && !regOpen && (
+      {tournament.status !== "live" && !regOpen ? (
         <div className="mt-4 flex justify-end">
           <Button asChild size="sm" variant="ghost">
-            <Link href={`/app/tournaments/${tournament.id}`}>View Details →</Link>
+            <Link href={`/app/tournaments/${tournament.id}`}>View Details</Link>
           </Button>
         </div>
-      )}
+      ) : null}
     </Card>
   );
 }
@@ -153,8 +172,8 @@ export function TournamentList({ status }: { status?: string }) {
     setLoading(true);
     const params = filter !== "all" ? `?status=${filter}` : "";
     fetch(`/api/tournaments${params}`)
-      .then(r => r.json())
-      .then(d => setTournaments(d.tournaments ?? []))
+      .then((r) => r.json())
+      .then((d) => setTournaments((d as { tournaments?: Tournament[] }).tournaments ?? []))
       .catch(() => setTournaments([]))
       .finally(() => setLoading(false));
   }, [filter]);
@@ -164,7 +183,7 @@ export function TournamentList({ status }: { status?: string }) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Tournaments</h2>
         <div className="flex gap-1">
-          {["all", "registration", "live", "upcoming", "completed"].map(s => (
+          {["all", "registration", "live", "upcoming", "completed"].map((s) => (
             <Button
               key={s}
               size="sm"
@@ -191,7 +210,9 @@ export function TournamentList({ status }: { status?: string }) {
         </Card>
       ) : (
         <div className="space-y-3">
-          {tournaments.map(t => <TournamentCard key={t.id} tournament={t} />)}
+          {tournaments.map((t) => (
+            <TournamentCard key={t.id} tournament={t} />
+          ))}
         </div>
       )}
     </div>

@@ -26,24 +26,52 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) {
-    // If view doesn't exist yet, fall back to user_profiles
+    // Fallback to users + ratings tables when the view is unavailable.
     const { data: fallback, error: fallbackError } = await supabase
-      .from("user_profiles")
-      .select("id, handle, display_name, avatar_url, elo_rating, wins, losses, total_battles, tier, is_verified")
+      .from("users")
+      .select(`
+        id,
+        username,
+        is_verified,
+        user_profiles ( display_name, avatar_url, tier ),
+        user_ratings ( rating, wins, losses, tier )
+      `)
       .eq("is_banned", false)
-      .gt("total_battles", 0)
-      .order("elo_rating", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (fallbackError) {
       return NextResponse.json({ error: fallbackError.message }, { status: 500 });
     }
 
-    const ranked = (fallback ?? []).map((p: Record<string, unknown>, i: number) => ({
-      rank: offset + i + 1,
-      ...p,
-      win_rate: p.total_battles ? Number(((p.wins as number) / (p.total_battles as number) * 100).toFixed(1)) : 0,
-    }));
+    const rows = (fallback ?? []) as Array<Record<string, unknown>>;
+    const ranked = rows
+      .map((row) => {
+        const ratings = Array.isArray(row.user_ratings) && row.user_ratings.length > 0
+          ? (row.user_ratings[0] as Record<string, unknown>)
+          : null;
+        const profile = Array.isArray(row.user_profiles) && row.user_profiles.length > 0
+          ? (row.user_profiles[0] as Record<string, unknown>)
+          : null;
+        const wins = Number(ratings?.wins ?? 0);
+        const losses = Number(ratings?.losses ?? 0);
+        const totalBattles = wins + losses;
+        return {
+          id: row.id,
+          handle: row.username,
+          display_name: profile?.display_name ?? null,
+          avatar_url: profile?.avatar_url ?? null,
+          elo_rating: Number(ratings?.rating ?? 1000),
+          wins,
+          losses,
+          total_battles: totalBattles,
+          tier: (ratings?.tier ?? profile?.tier ?? "bronze") as string,
+          is_verified: Boolean(row.is_verified),
+          win_rate: totalBattles ? Number(((wins / totalBattles) * 100).toFixed(1)) : 0,
+        };
+      })
+      .filter((row) => row.total_battles > 0)
+      .sort((a, b) => (b.elo_rating - a.elo_rating) || (b.wins - a.wins))
+      .map((row, index) => ({ ...row, rank: offset + index + 1 }));
 
     return NextResponse.json({ entries: ranked, period });
   }

@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  { params }: { params: Promise<{ userId: string }> },
 ) {
   const { userId } = await params;
   const { searchParams } = new URL(req.url);
@@ -16,35 +17,58 @@ export async function GET(
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
-  if (type === "following") {
-    const { data, error } = await supabase
-      .from("follows")
-      .select(`
-        created_at,
-        profile:user_profiles!following_id (
-          id, handle, display_name, avatar_url, tier, is_verified, elo_rating
-        )
-      `)
-      .eq("follower_id", userId)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+  const column = type === "following" ? "follower_id" : "following_id";
+  const targetColumn = type === "following" ? "following_id" : "follower_id";
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ users: (data ?? []).map((d: Record<string, unknown>) => d.profile), type });
-  } else {
-    const { data, error } = await supabase
-      .from("follows")
-      .select(`
-        created_at,
-        profile:user_profiles!follower_id (
-          id, handle, display_name, avatar_url, tier, is_verified, elo_rating
-        )
-      `)
-      .eq("following_id", userId)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+  const { data: follows, error } = await supabase
+    .from("follows")
+    .select(`created_at,${targetColumn}`)
+    .eq(column, userId)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ users: (data ?? []).map((d: Record<string, unknown>) => d.profile), type });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const targetIds = Array.from(
+    new Set(
+      (follows ?? [])
+        .map((row) => (row as Record<string, unknown>)[targetColumn])
+        .filter((id): id is string => typeof id === "string"),
+    ),
+  );
+
+  const [{ data: users }, { data: profiles }, { data: ratings }] = await Promise.all([
+    targetIds.length
+      ? supabase.from("users").select("id,username,is_verified").in("id", targetIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; username: string | null; is_verified: boolean | null }> }),
+    targetIds.length
+      ? supabase.from("user_profiles").select("user_id,display_name,avatar_url,tier").in("user_id", targetIds)
+      : Promise.resolve({ data: [] as Array<{ user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null }> }),
+    targetIds.length
+      ? supabase.from("user_ratings").select("user_id,rating,tier").in("user_id", targetIds)
+      : Promise.resolve({ data: [] as Array<{ user_id: string; rating: number | null; tier: string | null }> }),
+  ]);
+
+  const usersById = new Map((users ?? []).map((row) => [row.id, row]));
+  const profilesById = new Map((profiles ?? []).map((row) => [row.user_id, row]));
+  const ratingsById = new Map((ratings ?? []).map((row) => [row.user_id, row]));
+
+  const hydratedUsers = targetIds.map((id) => {
+    const user = usersById.get(id);
+    const profile = profilesById.get(id);
+    const rating = ratingsById.get(id);
+    return {
+      id,
+      handle: user?.username ?? id.slice(0, 8),
+      display_name: profile?.display_name ?? null,
+      avatar_url: profile?.avatar_url ?? null,
+      tier: rating?.tier ?? profile?.tier ?? "bronze",
+      is_verified: Boolean(user?.is_verified),
+      elo_rating: rating?.rating ?? 1000,
+    };
+  });
+
+  return NextResponse.json({ users: hydratedUsers, type });
 }

@@ -65,7 +65,6 @@ export function VideoBattleProduction({
       setError(null);
       const query = new URLSearchParams({
         room: battleId,
-        participant: viewerUserId,
       });
 
       const response = await fetch(`/api/livekit/token?${query.toString()}`);
@@ -92,11 +91,35 @@ export function VideoBattleProduction({
     };
   }, [battleId, viewerUserId]);
 
+  async function fetchTokenConfig(): Promise<LiveKitConfig | null> {
+    const query = new URLSearchParams({
+      room: battleId,
+    });
+
+    const response = await fetch(`/api/livekit/token?${query.toString()}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      setError(payload?.details ?? payload?.error ?? "token_fetch_failed");
+      return null;
+    }
+
+    const config = {
+      token: payload.token,
+      url: payload.url,
+    } satisfies LiveKitConfig;
+    setTokenConfig(config);
+    return config;
+  }
+
   async function connectToRoom() {
-    if (!tokenConfig) return;
     setIsConnecting(true);
     setError(null);
-    const ok = await client.connect(tokenConfig);
+    const config = tokenConfig ?? (await fetchTokenConfig());
+    if (!config) {
+      setIsConnecting(false);
+      return;
+    }
+    const ok = await client.connect(config);
     setIsConnecting(false);
     if (!ok) {
       setError("connect_failed");
@@ -168,7 +191,7 @@ export function VideoBattleProduction({
 
         <div className="mt-3 flex flex-wrap gap-2">
           {!connected ? (
-            <Button onClick={connectToRoom} disabled={!tokenConfig || isConnecting} data-testid="join-room">
+            <Button onClick={connectToRoom} disabled={isConnecting} data-testid="join-room">
               {isConnecting ? "Connecting..." : "Join Room"}
             </Button>
           ) : (

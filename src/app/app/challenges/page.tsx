@@ -92,7 +92,7 @@ function ChallengeCard({
               </span>
             </div>
             <div className="text-xs text-muted-foreground">
-              @{opponent.handle} · {opponent.elo_rating} ELO
+              @{opponent.handle} - {opponent.elo_rating} ELO
             </div>
           </div>
         </div>
@@ -125,7 +125,7 @@ function ChallengeCard({
               onClick={() => handleAction("accept")}
               disabled={!!loading}
             >
-              {loading === "accept" ? "…" : <><CheckCircle className="mr-1.5 h-3.5 w-3.5" />Accept</>}
+              {loading === "accept" ? "..." : <><CheckCircle className="mr-1.5 h-3.5 w-3.5" />Accept</>}
             </Button>
             <Button
               size="sm"
@@ -133,7 +133,7 @@ function ChallengeCard({
               onClick={() => handleAction("decline")}
               disabled={!!loading}
             >
-              {loading === "decline" ? "…" : <><XCircle className="mr-1.5 h-3.5 w-3.5" />Decline</>}
+              {loading === "decline" ? "..." : <><XCircle className="mr-1.5 h-3.5 w-3.5" />Decline</>}
             </Button>
           </div>
         )}
@@ -271,3 +271,4 @@ export default function ChallengesPage() {
     </div>
   );
 }
+

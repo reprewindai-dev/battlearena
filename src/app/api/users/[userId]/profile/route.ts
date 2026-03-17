@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 export async function GET(
   _req: NextRequest,
@@ -11,40 +12,46 @@ export async function GET(
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
-  const { data: profile, error } = await supabase
-    .from("player_stats")
-    .select("*")
-    .eq("id", userId)
-    .single();
+  const [{ data: userRow, error: userError }, { data: profileRow }, { data: ratingRow }] = await Promise.all([
+    supabase.from("users").select("id,username,is_verified,is_banned,created_at").eq("id", userId).maybeSingle(),
+    supabase.from("user_profiles").select("display_name,bio,avatar_url,tier,battle_stats,reputation_score").eq("user_id", userId).maybeSingle(),
+    supabase.from("user_ratings").select("rating,tier,wins,losses").eq("user_id", userId).maybeSingle(),
+  ]);
 
-  if (error || !profile) {
+  if (userError || !userRow || userRow.is_banned) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
-  // Fetch achievements
-  const { data: achievements } = await supabase
-    .from("user_achievements")
-    .select("*")
+  const { data: recentParticipantRows } = await supabase
+    .from("battle_participants")
+    .select("battle_id,user_id,slot,score")
     .eq("user_id", userId)
-    .order("earned_at", { ascending: false });
-
-  // Fetch recent battles
-  const { data: battles } = await supabase
-    .from("battles")
-    .select(`
-      id, status, mode, created_at,
-      participants:battle_participants!inner(
-        user_id, slot, score
-      )
-    `)
-    .contains("participant_ids", [userId])
-    .in("status", ["complete"])
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(20);
+  const battleIds = Array.from(new Set((recentParticipantRows ?? []).map((row) => row.battle_id)));
+  const { data: battles } = battleIds.length
+    ? await supabase
+        .from("battles")
+        .select("id,status,mode,created_at,winner_id,participant_1_id,participant_2_id")
+        .in("id", battleIds)
+        .order("created_at", { ascending: false })
+        .limit(10)
+    : { data: [] as Array<Record<string, unknown>> };
 
   return NextResponse.json({
-    profile,
-    achievements: achievements ?? [],
+    profile: {
+      id: userRow.id,
+      handle: userRow.username,
+      display_name: profileRow?.display_name ?? null,
+      bio: profileRow?.bio ?? null,
+      avatar_url: profileRow?.avatar_url ?? null,
+      is_verified: Boolean(userRow.is_verified),
+      elo_rating: ratingRow?.rating ?? 1000,
+      tier: ratingRow?.tier ?? profileRow?.tier ?? "bronze",
+      wins: ratingRow?.wins ?? 0,
+      losses: ratingRow?.losses ?? 0,
+      created_at: userRow.created_at,
+    },
+    achievements: [],
     recent_battles: battles ?? [],
   });
 }
@@ -63,8 +70,13 @@ export async function PATCH(
   if (!user || user.id !== userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  try {
+    await ensurePublicUserRecord(supabase, user);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
+  }
 
-  const body = await req.json();
+  const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
   const allowed = ["handle", "display_name", "bio", "avatar_url"] as const;
   type AllowedField = typeof allowed[number];
   const update: Partial<Record<AllowedField, string>> = {};
@@ -80,17 +92,35 @@ export async function PATCH(
     }
   }
 
+  if (update.handle) {
+    const { error: handleError } = await supabase
+      .from("users")
+      .update({ username: update.handle.toLowerCase() })
+      .eq("id", userId);
+    if (handleError) {
+      if (handleError.code === "23505") {
+        return NextResponse.json({ error: "Handle already taken" }, { status: 409 });
+      }
+      return NextResponse.json({ error: handleError.message }, { status: 500 });
+    }
+  }
+
   const { data, error } = await supabase
     .from("user_profiles")
-    .update({ ...update, updated_at: new Date().toISOString() })
-    .eq("id", userId)
+    .upsert(
+      {
+        user_id: userId,
+        display_name: update.display_name ?? null,
+        bio: update.bio ?? null,
+        avatar_url: update.avatar_url ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    )
     .select()
     .single();
 
   if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ error: "Handle already taken" }, { status: 409 });
-    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

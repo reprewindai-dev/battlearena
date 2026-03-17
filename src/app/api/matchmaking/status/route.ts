@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
-import { isMockRuntimeEnabled } from "@/lib/auth/mock-runtime";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import {
   normalizeQueueMode,
   runMatchmakingStep,
 } from "@/lib/matchmaking/server";
-import { runTestModeMatchmaking } from "@/lib/matchmaking/test-mode";
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -18,18 +16,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const queueType = normalizeQueueMode(url.searchParams.get("mode") ?? url.searchParams.get("queueType"));
   const battleFormat = url.searchParams.get("battleFormat") ?? "60s";
-  const testMode = isMockRuntimeEnabled();
-
   try {
-    if (testMode) {
-      const result = runTestModeMatchmaking({
-        userId: user.id,
-        queueType,
-        leave: false,
-      });
-      return NextResponse.json(result);
-    }
-
     const adminClient = createSupabaseServiceRoleClient();
 
     const result = await runMatchmakingStep({

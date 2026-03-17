@@ -43,6 +43,7 @@ export function RoomLobby() {
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedLobby, setSelectedLobby] = useState<string | null>(null);
+  const [selectedLobbyType, setSelectedLobbyType] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -82,8 +83,10 @@ export function RoomLobby() {
   };
 
   const handleLobbySelect = (lobbyId: string, lobbyType: string) => {
-    setSelectedLobby(lobbyId === selectedLobby ? null : lobbyId);
-    fetchRooms(lobbyType === selectedLobby ? undefined : lobbyType);
+    const isDeselect = lobbyId === selectedLobby;
+    setSelectedLobby(isDeselect ? null : lobbyId);
+    setSelectedLobbyType(isDeselect ? null : lobbyType);
+    fetchRooms(isDeselect ? undefined : lobbyType);
   };
 
   const handleJoinRoom = async (roomId: string) => {
@@ -110,7 +113,7 @@ export function RoomLobby() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md"
         />
-        <Button onClick={() => fetchRooms(selectedLobby || undefined)}>
+        <Button onClick={() => fetchRooms(selectedLobbyType || undefined)}>
           Search
         </Button>
       </div>

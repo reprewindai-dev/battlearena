@@ -107,6 +107,7 @@ export function BattleRoomCockpit() {
   const [latencyMs] = React.useState<number | null>(null);
   const [sessionId, setSessionId] = React.useState<string | null>(null);
   const [sessionMode, setSessionMode] = React.useState<"supabase" | null>(null);
+  const [viewerUserIdFallback, setViewerUserIdFallback] = React.useState<string | null>(null);
   const [sessionError, setSessionError] = React.useState<string | null>(null);
   const [autoCreateEnabled, setAutoCreateEnabled] = React.useState(true);
 
@@ -120,6 +121,29 @@ export function BattleRoomCockpit() {
   const [isFinalizing, setIsFinalizing] = React.useState(false);
   const [finalizeInfo, setFinalizeInfo] = React.useState<FinalizeApiOk | null>(null);
   const [nowMs, setNowMs] = React.useState(() => Date.now());
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadViewerUser() {
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { data } = await supabase.auth.getUser();
+        if (!cancelled) {
+          setViewerUserIdFallback(data.user?.id ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setViewerUserIdFallback(null);
+        }
+      }
+    }
+
+    void loadViewerUser();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -393,6 +417,8 @@ export function BattleRoomCockpit() {
 
   const slotA = sessionMeta?.participants?.find((p) => p.slot === 1) ?? null;
   const slotB = sessionMeta?.participants?.find((p) => p.slot === 2) ?? null;
+  const viewerUserId = sessionMeta?.viewer_user_id ?? viewerUserIdFallback;
+  const localSlot = slotA?.user_id === viewerUserId ? 1 : slotB?.user_id === viewerUserId ? 2 : 1;
   const showJoinAsB = Boolean(sessionId && !slotB);
 
   function formatParticipantLabel(p: BattleParticipant | null) {
@@ -659,7 +685,7 @@ export function BattleRoomCockpit() {
       return;
     }
 
-    const userId = sessionMeta?.viewer_user_id ?? null;
+    const userId = viewerUserId ?? null;
     const presenceKey = userId ?? crypto.randomUUID();
 
     const channel = supabase
@@ -747,11 +773,11 @@ export function BattleRoomCockpit() {
         // ignore
       }
     };
-  }, [isSupabaseMode, reloadMessages, reloadRecordings, reloadVotes, sessionId, sessionMeta?.viewer_user_id]);
+  }, [isSupabaseMode, reloadMessages, reloadRecordings, reloadVotes, sessionId, viewerUserId]);
 
   React.useEffect(() => {
     if (!isSupabaseMode || !sessionId) return;
-    const userId = sessionMeta?.viewer_user_id;
+    const userId = viewerUserId;
     if (!userId) return;
 
     if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
@@ -767,7 +793,7 @@ export function BattleRoomCockpit() {
       if (typingTimeoutRef.current) window.clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
     };
-  }, [chatDraft, isSupabaseMode, sessionId, sessionMeta?.viewer_user_id]);
+  }, [chatDraft, isSupabaseMode, sessionId, viewerUserId]);
 
   async function submitChat() {
     const body = chatDraft.trim();
@@ -1236,11 +1262,11 @@ export function BattleRoomCockpit() {
       </Card>
 
       {/* Video Battle UI */}
-      {sessionId && sessionMeta?.viewer_user_id ? (
+      {sessionId && viewerUserId ? (
         <VideoBattleProduction
           battleId={sessionId}
-          viewerUserId={sessionMeta.viewer_user_id}
-          localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
+          viewerUserId={viewerUserId}
+          localSlot={localSlot}
           onStreamReady={(stream) => {
             // Optional: handle stream ready for recording/broadcast
             console.log("Local video stream ready:", stream);

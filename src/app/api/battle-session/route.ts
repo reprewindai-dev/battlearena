@@ -64,9 +64,7 @@ export async function GET(req: Request) {
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")
-    .select(
-      "id,created_by,status,mode,created_at,started_at,ended_at,current_round,voting_opened_at,voting_closes_at,result",
-    )
+    .select("*")
     .eq("id", battleId)
     .maybeSingle();
 
@@ -103,24 +101,23 @@ export async function GET(req: Request) {
 
   const profilesById = new Map<string, { handle: string | null; display_name: string | null }>();
   if (userIds.length > 0) {
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("user_id,handle,display_name")
-      .in("user_id", userIds);
+    const [{ data: users, error: usersError }, { data: profiles, error: profilesError }] = await Promise.all([
+      supabase.from("users").select("id,username").in("id", userIds),
+      supabase.from("user_profiles").select("user_id,display_name").in("user_id", userIds),
+    ]);
 
-    if (profilesError) {
-      return NextResponse.json(
-        { error: "profiles_fetch_failed", details: profilesError.message },
-        { status: 400 },
-      );
-    }
-
-    for (const p of profiles ?? []) {
-      if (p.user_id) {
-        profilesById.set(p.user_id, {
-          handle: (p as { handle?: string | null }).handle ?? null,
-          display_name: (p as { display_name?: string | null }).display_name ?? null,
-        });
+    if (!usersError && !profilesError) {
+      for (const u of users ?? []) {
+        profilesById.set(u.id, { handle: u.username ?? null, display_name: null });
+      }
+      for (const p of profiles ?? []) {
+        if (p.user_id) {
+          const existing = profilesById.get(p.user_id);
+          profilesById.set(p.user_id, {
+            handle: existing?.handle ?? null,
+            display_name: (p as { display_name?: string | null }).display_name ?? null,
+          });
+        }
       }
     }
   }
@@ -172,9 +169,36 @@ export async function POST() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const username =
+    authData.user.email?.split("@")[0] ?? `user_${authData.user.id.slice(0, 8)}`;
+  const { error: userError } = await supabase.from("users").upsert(
+    {
+      id: authData.user.id,
+      email: authData.user.email ?? `${username}@battlearena.local`,
+      username,
+    },
+    { onConflict: "id" },
+  );
+
+  if (userError) {
+    return NextResponse.json(
+      { error: "user_sync_failed", details: userError.message },
+      { status: 400 },
+    );
+  }
+
   const { data: battleRows, error: battleError } = await supabase
     .from("battles")
-    .insert({ created_by: authData.user.id, status: "live", mode: "freestyle" })
+    .insert({
+      created_by: authData.user.id,
+      status: "live",
+      mode: "freestyle",
+      queue_type: "freestyle",
+      battle_type: "casual",
+      format: "60s",
+      battle_format: "60s",
+      room_code: `B${Date.now().toString().slice(-9)}`,
+    })
     .select("id")
     .limit(1);
 

@@ -78,22 +78,10 @@ export function GovernanceDashboard() {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('admin_token');
-      if (!token) {
-        setError('Admin authentication required');
-        return;
-      }
-
       const [statsResponse, metricsResponse, redTeamResponse] = await Promise.all([
-        fetch('/api/admin/governance?endpoint=stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/admin/governance?endpoint=metrics', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/admin/governance?endpoint=red-team', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        fetch('/api/admin/governance?endpoint=stats'),
+        fetch('/api/admin/governance?endpoint=metrics'),
+        fetch('/api/admin/governance?endpoint=red-team')
       ]);
 
       if (!statsResponse.ok || !metricsResponse.ok || !redTeamResponse.ok) {
@@ -120,15 +108,9 @@ export function GovernanceDashboard() {
 
   const runRedTeamSimulation = async (simulationType: string) => {
     try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) return;
-
       const response = await fetch('/api/admin/governance', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'run-red-team',
           simulation_type: simulationType
@@ -148,15 +130,9 @@ export function GovernanceDashboard() {
 
   const resetCircuitBreaker = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
-      if (!token) return;
-
       const response = await fetch('/api/admin/governance', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reset-circuit-breaker' })
       });
 

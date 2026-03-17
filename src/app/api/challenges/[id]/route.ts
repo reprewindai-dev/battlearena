@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 // PATCH - accept or decline
 export async function PATCH(
@@ -16,9 +17,14 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  try {
+    await ensurePublicUserRecord(supabase, user);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
+  }
 
-  const body = await req.json();
-  const { action } = body; // accept | decline
+  const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
+  const action = typeof body.action === "string" ? body.action : ""; // accept | decline
 
   if (!["accept", "decline"].includes(action)) {
     return NextResponse.json({ error: "action must be accept or decline" }, { status: 400 });

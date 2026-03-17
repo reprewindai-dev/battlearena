@@ -7,13 +7,13 @@ export async function GET() {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
-  const [profilesResult, battlesResult, tournamentsResult] = await Promise.all([
-    supabase.from("user_profiles").select("id", { count: "exact", head: true }),
+  const [usersResult, battlesResult, tournamentsResult] = await Promise.all([
+    supabase.from("users").select("id", { count: "exact", head: true }).eq("is_banned", false),
     supabase.from("battles").select("id", { count: "exact", head: true }),
     supabase.from("tournaments").select("id", { count: "exact", head: true }),
   ]);
 
-  const totalPlayers = profilesResult.count ?? 0;
+  const totalPlayers = usersResult.count ?? 0;
   const totalBattles = battlesResult.count ?? 0;
   const totalTournaments = tournamentsResult.count ?? 0;
 

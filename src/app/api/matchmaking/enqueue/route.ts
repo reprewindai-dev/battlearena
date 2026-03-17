@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
-import { isMockRuntimeEnabled } from "@/lib/auth/mock-runtime";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import {
   ensurePublicUser,
@@ -10,7 +9,6 @@ import {
   runMatchmakingStep,
   writeIdempotentMatchmakingResult,
 } from "@/lib/matchmaking/server";
-import { runTestModeMatchmaking } from "@/lib/matchmaking/test-mode";
 
 export async function POST(request: Request) {
   try {
@@ -32,17 +30,6 @@ export async function POST(request: Request) {
       typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
     const idempotencyKeyFromHeader = request.headers.get("x-idempotency-key")?.trim() ?? "";
     const idempotencyKey = idempotencyKeyFromHeader || idempotencyKeyFromBody;
-    const testMode = isMockRuntimeEnabled();
-
-    if (testMode) {
-      const result = runTestModeMatchmaking({
-        userId: user.id,
-        queueType,
-        leave,
-      });
-      return NextResponse.json(result);
-    }
-
     const adminClient = createSupabaseServiceRoleClient();
     const scope = `matchmaking:enqueue:${queueType}`;
 

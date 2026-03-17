@@ -1,9 +1,8 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -92,7 +91,7 @@ function FeedCard({ item }: { item: FeedItem }) {
           </Link>
           <TierBadge tier={item.actor.tier} />
           {item.actor.is_verified && (
-            <span className="text-blue-400" title="Verified">✓</span>
+            <span className="text-blue-400 text-xs" title="Verified">Verified</span>
           )}
         </div>
         <p className="mt-0.5 text-sm text-muted-foreground">{feedLabel(item)}</p>
@@ -181,7 +180,7 @@ export function CommunityFeed() {
               className="w-full"
               disabled={loading}
             >
-              {loading ? "Loading…" : "Load more"}
+              {loading ? "Loading..." : "Load more"}
             </Button>
           )}
         </div>
@@ -189,3 +188,4 @@ export function CommunityFeed() {
     </div>
   );
 }
+

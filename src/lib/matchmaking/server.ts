@@ -157,6 +157,36 @@ async function createBotBattle(adminClient: AdminClient, userId: string, queueTy
   };
 }
 
+export async function createImmediateBotMatch(params: {
+  adminClient: AdminClient;
+  userId: string;
+  queueType: QueueMode;
+  battleFormat: string;
+}) {
+  const { adminClient, userId, queueType, battleFormat } = params;
+
+  const bot = await createBotBattle(adminClient, userId, queueType, battleFormat, 0);
+
+  await adminClient
+    .from("matchmaking_queue")
+    .update({ status: "matched", battle_id: bot.battleId })
+    .eq("user_id", userId)
+    .eq("queue_type", queueType)
+    .in("status", ["active", "queued"]);
+
+  return {
+    ok: true,
+    mode: queueType,
+    status: "matched",
+    matched: true,
+    battleId: bot.battleId,
+    isBotBattle: true,
+    fallbackReason: "timed_bot_fallback",
+    waitTimeMs: 0,
+    queueType,
+  } satisfies MatchmakingResponse;
+}
+
 export async function runMatchmakingStep(params: {
   adminClient: AdminClient;
   userId: string;
@@ -337,11 +367,12 @@ export async function readIdempotentMatchmakingResult(params: {
   scope: string;
 }): Promise<{ statusCode: number; response: MatchmakingResponse } | null> {
   const { adminClient, userId, key, scope } = params;
+  const storageKey = `${userId}:${scope}:${key}`;
 
   const { data } = await adminClient
     .from("idempotency_keys")
     .select("status_code,response")
-    .eq("key", key)
+    .eq("key", storageKey)
     .eq("scope", scope)
     .eq("user_id", userId)
     .maybeSingle();
@@ -363,10 +394,11 @@ export async function writeIdempotentMatchmakingResult(params: {
   response: MatchmakingResponse;
 }) {
   const { adminClient, userId, key, scope, statusCode, response } = params;
+  const storageKey = `${userId}:${scope}:${key}`;
 
   await adminClient.from("idempotency_keys").upsert(
     {
-      key,
+      key: storageKey,
       scope,
       user_id: userId,
       status_code: statusCode,
