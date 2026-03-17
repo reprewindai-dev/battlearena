@@ -20,6 +20,51 @@ Authorization: Bearer <jwt_token>
 
 ## Core Endpoints
 
+### Battle Runtime (Canonical)
+
+- Canonical live battle runtime route: `/app/battles/room`
+- Legacy `/app/battles/pvp` is deprecated and redirects to `/app/battles/room`.
+- Live battle APIs are real-runtime only (no mock auth/runtime in production battle paths).
+
+#### GET /api/livekit/token
+Requires authenticated session and room-scoped authorization.
+
+Query:
+- `room` (battle id)
+- `participant` (must match authenticated user id)
+
+Response:
+```json
+{
+  "token": "jwt",
+  "url": "ws://... or wss://...",
+  "room": "battle_uuid",
+  "participant": "user_uuid",
+  "role": "participant|spectator"
+}
+```
+
+#### POST /api/matchmaking/enqueue
+Server-authoritative matchmaking enqueue/dequeue endpoint.
+
+Response contract:
+```json
+{
+  "ok": true,
+  "mode": "freestyle|ranked|tournament",
+  "status": "queued|matched|none",
+  "matched": true,
+  "battleId": "uuid",
+  "isBotBattle": false,
+  "fallbackReason": "none|timed_bot_fallback",
+  "waitTimeMs": 0,
+  "queueType": "freestyle|ranked|tournament"
+}
+```
+
+#### GET /api/matchmaking/status
+Returns normalized queue status with the same contract fields used by enqueue.
+
 ### Authentication Service
 
 #### POST /auth/register
@@ -279,6 +324,29 @@ Spend tokens (tip, purchase, etc.).
 
 #### GET /economy/transactions
 Get transaction history.
+#### POST /economy/tokens/confirm
+Finalize token credit after Stripe PaymentIntent confirmation.
+
+**Request Body:**
+```json
+{
+  "payment_intent_id": "pi_..."
+}
+```
+
+#### POST /subscriptions/create
+Create Stripe subscription in `default_incomplete` mode and return PaymentIntent client secret.
+
+**Request Body:**
+```json
+{
+  "plan_id": "pro",
+  "payment_method": "card"
+}
+```
+
+#### POST /stripe/webhook
+Stripe webhook endpoint for payment/subscription settlement (signature required).
 
 #### POST /economy/payouts/request
 Request payout of earned points.
@@ -571,3 +639,4 @@ The API is versioned using URL paths:
 - `/v2/` - Next version (when available)
 
 Backward compatibility is maintained for at least 6 months after deprecation.
+

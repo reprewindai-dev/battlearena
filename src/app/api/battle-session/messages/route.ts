@@ -23,6 +23,9 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: rows, error } = await supabase
     .from("battle_messages")
@@ -41,24 +44,28 @@ export async function GET(req: Request) {
 
   const profilesById = new Map<string, { handle: string | null; display_name: string | null }>();
   if (userIds.length > 0) {
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("user_id,handle,display_name")
-      .in("user_id", userIds);
+    const [{ data: users, error: usersError }, { data: profiles, error: profilesError }] = await Promise.all([
+      supabase.from("users").select("id,username").in("id", userIds),
+      supabase.from("user_profiles").select("user_id,display_name").in("user_id", userIds),
+    ]);
 
-    if (profilesError) {
+    if (usersError || profilesError) {
       return NextResponse.json(
-        { error: "profiles_fetch_failed", details: profilesError.message },
+        { error: "profiles_fetch_failed", details: usersError?.message ?? profilesError?.message ?? "unknown" },
         { status: 400 },
       );
     }
 
+    for (const u of users ?? []) {
+      profilesById.set(u.id, {
+        handle: u.username ?? null,
+        display_name: null,
+      });
+    }
     for (const p of profiles ?? []) {
       if (p.user_id) {
-        profilesById.set(p.user_id, {
-          handle: (p as { handle?: string | null }).handle ?? null,
-          display_name: (p as { display_name?: string | null }).display_name ?? null,
-        });
+        const existing = profilesById.get(p.user_id);
+        profilesById.set(p.user_id, { handle: existing?.handle ?? null, display_name: (p as { display_name?: string | null }).display_name ?? null });
       }
     }
   }
@@ -97,6 +104,9 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

@@ -7,7 +7,7 @@ import { env } from "@/env";
 
 type CleanupResult = {
   ok: true;
-  mode: "mock" | "supabase";
+  mode: "supabase";
   scanned_rows: number;
   deleted_rows: number;
   deleted_objects: number;

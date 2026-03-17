@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -15,24 +19,42 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "types": ["node", "react", "react-dom"],
-    "typeRoots": ["./node_modules/@types"],
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ],
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
     "plugins": [
       {
         "name": "next"
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.mts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    ".next/dev/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "arena-web", "apps", "package.monorepo.json", "package-lock.monorepo.json"]
+  "exclude": [
+    "node_modules",
+    "arena-web",
+    "apps",
+    ".next/dev",
+    "battlearena",
+    "windsurf-project-3",
+    "package.monorepo.json",
+    "package-lock.monorepo.json"
+  ]
 }

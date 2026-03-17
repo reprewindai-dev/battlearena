@@ -1,0 +1,54 @@
+services:
+  # Supabase Auth
+  auth:
+    image: ghcr.io/supabase/auth:v2.91.0
+    restart: unless-stopped
+    ports:
+      - '9999:9999'
+    environment:
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_DB_DATABASE_URL=postgresql://postgres:postgres@postgres:5432/arena_v2
+      - GOTRUE_SITE_URL=http://localhost:3001
+      - GOTRUE_URI_ALLOW_LIST=*
+      - GOTRUE_DISABLE_SIGNUP=false
+      - GOTRUE_JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - GOTRUE_JWT_EXP=3600
+      - GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
+      - GOTRUE_EXTERNAL_EMAIL_ENABLED=true
+      - GOTRUE_MAILER_AUTOCONFIRM=true
+    depends_on:
+      - postgres
+
+  # Supabase REST API
+  rest:
+    image: postgrest/postgrest:v12.0.1
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      - PGRST_DB_URI=postgresql://postgres:postgres@postgres:5432/arena_v2
+      - PGRST_DB_SCHEMAS=public
+      - PGRST_DB_ANON_ROLE=anon
+      - PGRST_JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - PGRST_DB_MAX_ROWS=1000
+      - PGRST_DB_PREPARED_STATEMENTS=true
+    depends_on:
+      - postgres
+
+  # Use existing PostgreSQL
+  postgres:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=arena_v2
+      - POSTGRES_USER=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

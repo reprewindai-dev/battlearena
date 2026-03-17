@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 type CleanupResponse =
-  | { ok: true; mode: "mock" | "supabase"; deleted_rows: number; deleted_objects: number }
+  | { ok: true; mode: "supabase"; deleted_rows: number; deleted_objects: number }
   | { error: string; details?: string };
 
 export function AdminMaintenancePanel() {

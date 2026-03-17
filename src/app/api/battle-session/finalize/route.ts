@@ -25,6 +25,9 @@ export async function POST(req: Request) {
 
   const role = await getSessionRole();
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")
@@ -166,6 +169,30 @@ export async function POST(req: Request) {
     ...result,
     rating_deltas: eloData?.elo ?? null,
   };
+
+  // Post activity feed entry for community feed (fire-and-forget — never block finalize)
+  try {
+    const winnerParticipant = winnerSlot
+      ? (participants ?? []).find((p) => p.slot === winnerSlot)
+      : null;
+    await supabase.from("activity_feed").insert({
+      actor_id: winnerParticipant?.id ?? user.id,
+      type: "battle_complete",
+      entity_id: battleId,
+      entity_type: "battle",
+      metadata: {
+        battle_id: battleId,
+        winner_slot: winnerSlot,
+        votes_a: countA,
+        votes_b: countB,
+        mode: battle.result && typeof battle.result === "object" && "mode" in battle.result
+          ? (battle.result as Record<string, unknown>).mode
+          : "freestyle",
+      },
+    });
+  } catch {
+    // Non-critical — swallow silently
+  }
 
   return NextResponse.json({ ok: true, mode: "supabase", battleId, result: enrichedResult, rpc: rpcData, elo: eloData, idempotent: false });
 }

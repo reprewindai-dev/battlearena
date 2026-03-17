@@ -10,7 +10,10 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const mode = url.searchParams.get("mode") ?? "freestyle";
+  const queueType = normalizeQueueMode(url.searchParams.get("mode") ?? url.searchParams.get("queueType"));
+  const battleFormat = url.searchParams.get("battleFormat") ?? "60s";
+  try {
+    const adminClient = createSupabaseServiceRoleClient();
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("matchmaking_status", { p_mode: mode });

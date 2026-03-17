@@ -23,9 +23,30 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const username =
+    authData.user.email?.split("@")[0] ?? `user_${authData.user.id.slice(0, 8)}`;
+  const { error: userError } = await supabase.from("users").upsert(
+    {
+      id: authData.user.id,
+      email: authData.user.email ?? `${username}@battlearena.local`,
+      username,
+    },
+    { onConflict: "id" },
+  );
+
+  if (userError) {
+    return NextResponse.json(
+      { error: "user_sync_failed", details: userError.message },
+      { status: 400 },
+    );
   }
 
   const userId = authData.user.id;

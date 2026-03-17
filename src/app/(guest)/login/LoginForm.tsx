@@ -55,7 +55,7 @@ export default function LoginForm({ nextPath }: { nextPath: string }) {
       router.refresh();
     } catch {
       setError(
-        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY or use mock mode.",
+        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
   }

@@ -103,6 +103,8 @@ export default async function BattleHistoryPage(props: {
 
   async function getHistory(): Promise<{ items: HistoryItem[]; total: number }> {
     const supabase = await createSupabaseServerClient();
+    if (!supabase) return { items: [], total: 0 }; // Handle null return
+
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
     if (!uid) return { items: [], total: 0 };

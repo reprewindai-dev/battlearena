@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 type UploadInitResponse =
   | {
       ok: true;
-      mode: "mock" | "supabase";
+      mode: "supabase";
       recordingId: string;
       bucket: string;
       path: string;
@@ -39,11 +39,14 @@ export async function POST(req: Request) {
       ? ((body as Record<string, unknown>).bytes as unknown)
       : null;
 
-  if (typeof battleId !== "string" || battleId.length === 0) {
+  if (!battleId) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

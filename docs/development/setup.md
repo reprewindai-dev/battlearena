@@ -51,7 +51,6 @@ FRONTEND_URL=http://localhost:3000
 # Development Settings
 NODE_ENV=development
 LOG_LEVEL=debug
-ENABLE_MOCK_PAYMENTS=true
 ```
 
 ### 3. Docker Development Stack
@@ -75,7 +74,7 @@ The development stack includes:
 - **MinIO**: Local object storage (S3 compatible)
 - **Elasticsearch**: Search and analytics
 - **API Gateway**: Local API gateway
-- **Mock Services**: Payment processors, external APIs
+- **Live Integrations**: Supabase auth/data, LiveKit media, Stripe test mode
 
 ### 4. Database Setup
 

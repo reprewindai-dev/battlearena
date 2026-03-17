@@ -44,6 +44,9 @@ export async function POST(req: Request) {
 
   const role = await getSessionRole();
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")

@@ -16,6 +16,9 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
 
   const { data: row, error } = await supabase
     .from("battle_recordings")
