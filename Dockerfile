@@ -44,12 +44,14 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --chown=nextjs:nodejs scripts/render-start.sh ./render-start.sh
+
+RUN chmod +x ./render-start.sh
 
 USER nextjs
 
-EXPOSE 3000
+EXPOSE 10000
 
-ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "server.js"]
+CMD ["./render-start.sh"]
