@@ -19,3 +19,16 @@ battlearena
 windsurf-project-3
 supabase.zip
 supabase.exe
+backend
+database
+docs
+e2e
+infrastructure
+migrations
+playbooks
+services
+supabase
+volumes
+*.md
+*.sql
+*.zip
