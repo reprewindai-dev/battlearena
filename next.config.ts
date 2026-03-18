@@ -7,6 +7,7 @@ const configDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = configDir;
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   turbopack: {
     root: repoRoot,
   },
