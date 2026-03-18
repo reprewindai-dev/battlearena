@@ -1,6 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Trophy } from "lucide-react";
+import { toast } from "sonner";
+
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,115 +12,123 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trophy, Plus } from "lucide-react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-type Tournament = {
+type TournamentStatus = "upcoming" | "registration" | "live" | "completed" | "cancelled";
+
+type TournamentListItem = {
   id: string;
   name: string;
-  description: string;
-  entry_fee_cents: number;
-  prize_pool_cents: number;
+  description: string | null;
+  status: TournamentStatus;
+  format: string;
   max_participants: number;
-  status: "upcoming" | "active" | "completed" | "canceled";
+  tournament_type: string | null;
+  entry_fee_tokens: number;
+  prize_pool_tokens: number;
+  starts_at: string | null;
+  registration_closes: string | null;
+  registration_opens: string | null;
+  created_at: string;
+  created_by: string | null;
+  participant_count: Array<{ count: number }> | null;
+  registration_ends_at?: string | null;
+};
+
+type TournamentsResponse = {
+  tournaments: TournamentListItem[];
+  total: number;
+};
+
+type CreateTournamentForm = {
+  name: string;
+  description: string;
+  format: string;
+  tournament_type: string;
+  max_participants: number;
+  entry_fee_tokens: number;
+  prize_pool_tokens: number;
   starts_at: string;
-  ends_at: string;
-  current_participants: number;
-  created_by: string;
+  registration_ends_at: string;
+};
+
+const initialCreateForm: CreateTournamentForm = {
+  name: "",
+  description: "",
+  format: "single_elimination",
+  tournament_type: "open",
+  max_participants: 16,
+  entry_fee_tokens: 0,
+  prize_pool_tokens: 0,
+  starts_at: "",
+  registration_ends_at: "",
 };
 
 export default function TournamentsPage() {
-  const [tournaments, setTournaments] = React.useState<Tournament[]>([]);
+  const router = useRouter();
+  const [tournaments, setTournaments] = React.useState<TournamentListItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [isCreating, setIsCreating] = React.useState(false);
   const [isJoining, setIsJoining] = React.useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
-  
-  const [createForm, setCreateForm] = React.useState({
-    name: "",
-    description: "",
-    entry_fee_cents: 0,
-    prize_pool_cents: 0,
-    max_participants: 16,
-    starts_at: "",
-    ends_at: "",
-    rules: "",
-  });
-
-  const supabase = createSupabaseBrowserClient();
+  const [createForm, setCreateForm] = React.useState<CreateTournamentForm>(initialCreateForm);
 
   const fetchTournaments = React.useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setError("Authentication required");
-        return;
-      }
-
       const response = await fetch("/api/tournaments", {
-        headers: {
-          "Authorization": `Bearer ${session.access_token}`,
-        },
+        cache: "no-store",
       });
 
-      if (response.status === 403) {
-        setError("Tournaments require an Enterprise subscription");
-        return;
-      }
-
       if (!response.ok) {
-        throw new Error("Failed to fetch tournaments");
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Failed to fetch tournaments");
       }
 
-      const data = await response.json();
-      setTournaments(data);
+      const data = (await response.json()) as TournamentsResponse;
+      setTournaments(data.tournaments ?? []);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load tournaments");
     } finally {
       setIsLoading(false);
     }
-  }, [supabase.auth]);
+  }, []);
 
   React.useEffect(() => {
-    fetchTournaments();
+    void fetchTournaments();
   }, [fetchTournaments]);
 
   async function handleCreateTournament() {
     setIsCreating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const response = await fetch("/api/tournaments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(createForm),
       });
 
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; tournament?: { id?: string } }
+        | null;
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create tournament");
+        throw new Error(payload?.error ?? "Failed to create tournament");
       }
 
       setShowCreateDialog(false);
-      setCreateForm({
-        name: "",
-        description: "",
-        entry_fee_cents: 0,
-        prize_pool_cents: 0,
-        max_participants: 16,
-        starts_at: "",
-        ends_at: "",
-        rules: "",
-      });
-      
+      setCreateForm(initialCreateForm);
+      toast.success("Tournament created.");
       await fetchTournaments();
+
+      if (payload?.tournament?.id) {
+        router.push(`/app/tournaments/${encodeURIComponent(payload.tournament.id)}`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create tournament");
+      const message = err instanceof Error ? err.message : "Failed to create tournament";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsCreating(false);
     }
@@ -125,23 +137,39 @@ export default function TournamentsPage() {
   async function handleJoinTournament(tournamentId: string) {
     setIsJoining(tournamentId);
     try {
-      // TODO: Implement tournament joining logic
-      console.log("Joining tournament:", tournamentId);
+      const response = await fetch(`/api/tournaments/${encodeURIComponent(tournamentId)}/register`, {
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Failed to join tournament");
+      }
+
+      toast.success("Tournament registration complete.");
+      await fetchTournaments();
+      router.push(`/app/tournaments/${encodeURIComponent(tournamentId)}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to join tournament");
+      const message = err instanceof Error ? err.message : "Failed to join tournament";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsJoining(null);
     }
+  }
+
+  function handleViewTournament(tournamentId: string) {
+    router.push(`/app/tournaments/${encodeURIComponent(tournamentId)}`);
   }
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/3"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="h-8 w-1/3 rounded bg-muted" />
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-64 bg-muted rounded"></div>
+              <div key={i} className="h-64 rounded bg-muted" />
             ))}
           </div>
         </div>
@@ -152,34 +180,32 @@ export default function TournamentsPage() {
   if (error) {
     return (
       <div className="container mx-auto py-8">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-2">Tournaments Unavailable</h2>
-          <p className="text-muted-foreground mb-4">{error}</p>
-          {error.includes("Enterprise") && (
-            <a href="/billing" className="text-primary hover:underline">
-              Upgrade to Enterprise Plan
-            </a>
-          )}
+        <div className="py-12 text-center">
+          <h2 className="mb-2 text-2xl font-bold">Tournaments Unavailable</h2>
+          <p className="mb-4 text-muted-foreground">{error}</p>
+          <Button onClick={() => void fetchTournaments()} variant="outline">
+            Retry
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="container mx-auto space-y-8 py-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-3xl font-bold">
             <Trophy className="h-8 w-8" />
             Tournaments
           </h1>
-          <p className="text-muted-foreground">Compete in organized battles for prizes</p>
+          <p className="text-muted-foreground">Compete in organized battles for prizes.</p>
         </div>
 
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 h-4 w-4" />
               Create Tournament
             </Button>
           </DialogTrigger>
@@ -187,10 +213,10 @@ export default function TournamentsPage() {
             <DialogHeader>
               <DialogTitle>Create Tournament</DialogTitle>
               <DialogDescription>
-                Set up a new battle tournament with entry fees and prizes
+                Create a tournament with real registration windows, token entry, and prize pool configuration.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -198,7 +224,7 @@ export default function TournamentsPage() {
                   <Input
                     id="name"
                     value={createForm.name}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="Summer Battle Championship"
                   />
                 </div>
@@ -210,7 +236,12 @@ export default function TournamentsPage() {
                     min="4"
                     max="64"
                     value={createForm.max_participants}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, max_participants: parseInt(e.target.value) }))}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        max_participants: Number.parseInt(e.target.value || "0", 10) || 4,
+                      }))
+                    }
                   />
                 </div>
               </div>
@@ -220,32 +251,42 @@ export default function TournamentsPage() {
                 <Textarea
                   id="description"
                   value={createForm.description}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, description: e.target.value }))}
                   placeholder="Describe your tournament rules and format"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="entry_fee">Entry Fee ($)</Label>
+                  <Label htmlFor="entry_fee_tokens">Entry Fee (tokens)</Label>
                   <Input
-                    id="entry_fee"
+                    id="entry_fee_tokens"
                     type="number"
                     min="0"
-                    step="0.01"
-                    value={createForm.entry_fee_cents / 100}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, entry_fee_cents: Math.round(parseFloat(e.target.value) * 100) }))}
+                    step="1"
+                    value={createForm.entry_fee_tokens}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        entry_fee_tokens: Number.parseInt(e.target.value || "0", 10) || 0,
+                      }))
+                    }
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="prize_pool">Prize Pool ($)</Label>
+                  <Label htmlFor="prize_pool_tokens">Prize Pool (tokens)</Label>
                   <Input
-                    id="prize_pool"
+                    id="prize_pool_tokens"
                     type="number"
                     min="0"
-                    step="0.01"
-                    value={createForm.prize_pool_cents / 100}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, prize_pool_cents: Math.round(parseFloat(e.target.value) * 100) }))}
+                    step="1"
+                    value={createForm.prize_pool_tokens}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        prize_pool_tokens: Number.parseInt(e.target.value || "0", 10) || 0,
+                      }))
+                    }
                   />
                 </div>
               </div>
@@ -257,28 +298,20 @@ export default function TournamentsPage() {
                     id="starts_at"
                     type="datetime-local"
                     value={createForm.starts_at}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, starts_at: e.target.value }))}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, starts_at: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ends_at">End Date</Label>
+                  <Label htmlFor="registration_ends_at">Registration Closes</Label>
                   <Input
-                    id="ends_at"
+                    id="registration_ends_at"
                     type="datetime-local"
-                    value={createForm.ends_at}
-                    onChange={(e) => setCreateForm(prev => ({ ...prev, ends_at: e.target.value }))}
+                    value={createForm.registration_ends_at}
+                    onChange={(e) =>
+                      setCreateForm((prev) => ({ ...prev, registration_ends_at: e.target.value }))
+                    }
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rules">Rules (JSON)</Label>
-                <Textarea
-                  id="rules"
-                  value={createForm.rules}
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, rules: e.target.value }))}
-                  placeholder='{"format": "single_elimination", "battle_duration": 300}'
-                />
               </div>
             </div>
 
@@ -286,7 +319,7 @@ export default function TournamentsPage() {
               <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleCreateTournament} disabled={isCreating}>
+              <Button onClick={() => void handleCreateTournament()} disabled={isCreating}>
                 {isCreating ? "Creating..." : "Create Tournament"}
               </Button>
             </div>
@@ -299,17 +332,18 @@ export default function TournamentsPage() {
           <CardHeader>
             <CardTitle>No Tournaments</CardTitle>
             <CardDescription>
-              Be the first to create a tournament or check back later for upcoming events.
+              No open tournaments yet. Create one or check back for upcoming events.
             </CardDescription>
           </CardHeader>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {tournaments.map((tournament) => (
             <TournamentCard
               key={tournament.id}
               tournament={tournament}
               onJoin={handleJoinTournament}
+              onView={handleViewTournament}
               isJoining={isJoining === tournament.id}
             />
           ))}

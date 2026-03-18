@@ -13,7 +13,6 @@ export async function trackUsage(eventType: EventType, eventData: Record<string,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({
         event_type: eventType,
@@ -36,7 +35,6 @@ export async function checkUsageLimit(eventType: EventType): Promise<boolean> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ event_type: eventType }),
     });

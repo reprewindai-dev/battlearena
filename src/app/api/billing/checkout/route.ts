@@ -12,18 +12,31 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = await createSupabaseServerClient();
+    if (!supabase) {
+      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+    }
+
     const headersList = await headers();
     const authHeader = headersList.get("authorization");
 
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let user = null;
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error) {
+        return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      }
+      user = data.user;
+    } else {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      user = data.user;
     }
 
-    const token = authHeader.substring(7);
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get or create Stripe customer

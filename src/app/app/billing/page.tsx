@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
 import { PLANS, type PlanType } from "@/lib/billing/stripe";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { toast } from "sonner";
 
 type UserProfile = {
   subscription_tier: PlanType;
@@ -51,24 +52,27 @@ export default function BillingPage() {
   async function handleUpgrade(plan: PlanType) {
     setIsUpgrading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ planType: plan }),
       });
 
-      const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
+      const data = (await response.json().catch(() => null)) as { error?: string; url?: string } | null;
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Failed to create checkout session");
       }
+      const checkoutUrl = data?.url;
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+        return;
+      }
+      throw new Error("Checkout session did not return a URL");
     } catch (error) {
       console.error("Failed to create checkout session:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to create checkout session");
     } finally {
       setIsUpgrading(false);
     }

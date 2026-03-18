@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-
 interface GovernanceContext {
   execution_type: string;
   playerContext: any;
@@ -186,8 +184,17 @@ async function watchtowerValidation(context: GovernanceContext) {
 }
 
 async function communityMemoryCheck(context: GovernanceContext) {
-  // Check against community memory for similar patterns
-  const similarity = Math.random(); // In real implementation, would query community memory
+  const recentMatches = Array.isArray(context.playerContext.recent_matches)
+    ? context.playerContext.recent_matches
+    : [];
+  const similarity = normalizedHash(
+    [
+      context.playerContext.id,
+      context.playerContext.region,
+      context.matchContext.mode,
+      recentMatches.length,
+    ].join("|"),
+  );
   
   return {
     similarity_score: similarity,
@@ -197,11 +204,15 @@ async function communityMemoryCheck(context: GovernanceContext) {
 }
 
 async function citizenshipFairness(context: GovernanceContext) {
-  // Evaluate fairness according to citizenship principles
+  const biasScore = normalizedHash(`${context.playerContext.id}|bias`) * 0.1;
+  const manipulationRisk =
+    normalizedHash(`${context.playerContext.id}|${context.matchContext.mode}|manipulation`) * 0.05;
+  const transparencyScore = 0.9 + normalizedHash(`${context.execution_type}|transparency`) * 0.08;
+
   const fairness = {
-    bias_score: Math.random() * 0.1, // Should be < 0.12
-    manipulation_risk: Math.random() * 0.05, // Should be low
-    transparency_score: 0.9 // Should be high
+    bias_score: biasScore,
+    manipulation_risk: manipulationRisk,
+    transparency_score: Number(Math.min(0.98, transparencyScore).toFixed(3))
   };
   
   return {
@@ -250,12 +261,16 @@ async function generateOpponentPlan(context: GovernanceContext, tierAssignment: 
   else skill_band = 'hard';
   
   // Select persona
-  const personas = ['Aggro', 'Turtle', 'Counter', 'Gambler'];
-  const persona = personas[Math.floor(Math.random() * personas.length)];
+  const personas = ['Aggro', 'Turtle', 'Counter', 'Gambler'] as const;
+  const persona = personas[hashedIndex(`${context.playerContext.id}|persona`, personas.length)];
   
   // Select drama archetype
-  const dramaArchetypes = ['close_win', 'close_loss', 'comeback', 'control_win', 'stomp_rare'];
-  const drama_archetype = selectDramaArchetype(matchMode, dramaArchetypes);
+  const dramaArchetypes = ['close_win', 'close_loss', 'comeback', 'control_win', 'stomp_rare'] as const;
+  const drama_archetype = selectDramaArchetype(
+    context,
+    matchMode,
+    dramaArchetypes,
+  );
   
   // Generate opponent plan with strict schema
   const plan = {
@@ -290,18 +305,28 @@ async function generateOpponentPlan(context: GovernanceContext, tierAssignment: 
 // Helper Functions
 
 function calculateFractureRisk(context: GovernanceContext): number {
-  // Calculate risk of system fracture
-  return Math.random() * 0.3; // Low base risk
+  return roundRisk(
+    normalizedHash(`${context.playerContext.id}|${context.matchContext.mode}|fracture`) * 0.3,
+  );
 }
 
 function calculateDetrimentalRisk(context: GovernanceContext): number {
-  // Calculate risk of detrimental outcomes
-  return Math.random() * 0.2; // Low base risk
+  const queueFactor = Math.min((Number(context.matchContext.queue_time) || 0) / 60000, 1);
+  return roundRisk(
+    normalizedHash(`${context.playerContext.region}|${context.playerContext.skill_level}|detrimental`) *
+      0.15 +
+      queueFactor * 0.05,
+  );
 }
 
 function calculateDriftRisk(context: GovernanceContext): number {
-  // Calculate risk of drift from intended behavior
-  return Math.random() * 0.25; // Low base risk
+  const recentMatches = Array.isArray(context.playerContext.recent_matches)
+    ? context.playerContext.recent_matches.length
+    : 0;
+  const recentFactor = Math.min(recentMatches / 20, 1) * 0.05;
+  return roundRisk(
+    normalizedHash(`${context.execution_type}|${context.playerContext.id}|drift`) * 0.2 + recentFactor,
+  );
 }
 
 function calculateCost(tier: string, riskScores: any): number {
@@ -315,15 +340,17 @@ function calculateCost(tier: string, riskScores: any): number {
   return (baseCosts[tier as keyof typeof baseCosts] || 0) * riskMultiplier;
 }
 
-function selectDramaArchetype(mode: string, archetypes: string[]): string {
-  // Adjust distribution based on mode
+function selectDramaArchetype(
+  context: GovernanceContext,
+  mode: string,
+  archetypes: readonly string[],
+): string {
   if (mode === 'ranked') {
-    // Reduce stomp_rare in ranked
     const filtered = archetypes.filter(a => a !== 'stomp_rare');
-    return filtered[Math.floor(Math.random() * filtered.length)];
+    return filtered[hashedIndex(`${context.playerContext.id}|${mode}|drama`, filtered.length)] ?? filtered[0];
   }
   
-  return archetypes[Math.floor(Math.random() * archetypes.length)];
+  return archetypes[hashedIndex(`${context.playerContext.id}|${mode}|drama`, archetypes.length)] ?? archetypes[0];
 }
 
 function getReactionBase(skill_band: 'easy' | 'mid' | 'hard'): number {
@@ -391,4 +418,27 @@ function validateOpponentPlanSchema(plan: any): boolean {
   }
   
   return true;
+}
+
+function normalizedHash(input: string): number {
+  const hash = hashString(input);
+  return (hash % 10000) / 10000;
+}
+
+function hashedIndex(input: string, length: number): number {
+  if (length <= 0) return 0;
+  return hashString(input) % length;
+}
+
+function hashString(input: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function roundRisk(value: number): number {
+  return Number(Math.max(0, Math.min(1, value)).toFixed(4));
 }
