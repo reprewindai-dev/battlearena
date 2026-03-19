@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getSessionRole } from "@/lib/auth/session";
+import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import {
   GovernedOpponentOrchestrator,
   type MatchContext,
@@ -495,7 +495,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await requireAdmin())) {
+  const actor = await getSessionUser();
+  if (!(await requireAdmin()) || !actor) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -521,6 +522,15 @@ export async function POST(request: NextRequest) {
         parsed.matchContext as MatchContext,
       );
     }
+
+    await createSupabaseServiceRoleClient().from("admin_audit_log").insert({
+      actor_user_id: actor.id,
+      action: "admin_governance_action",
+      payload: {
+        action,
+        simulation_type: body.simulation_type ?? null,
+      },
+    });
 
     return NextResponse.json({
       success: true,
