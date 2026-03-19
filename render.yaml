@@ -43,6 +43,8 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_BILLING_WEBHOOK_SECRET
+        sync: false
       - key: STRIPE_PRICE_SUB_SPECTATOR_MONTHLY
         sync: false
       - key: STRIPE_PRICE_SUB_PRO_MONTHLY

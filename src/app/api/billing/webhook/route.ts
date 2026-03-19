@@ -19,14 +19,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
+  const webhookSecret =
+    process.env.STRIPE_BILLING_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    return NextResponse.json({ error: "stripe_billing_webhook_secret_missing" }, { status: 500 });
+  }
+
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Webhook signature verification failed:", message);
@@ -59,13 +62,11 @@ export async function POST(request: NextRequest) {
           break;
         }
 
-        // Get subscription details for period end
         const subscriptionId = session.subscription as string;
-        const subscription = subscriptionId 
+        const subscription = subscriptionId
           ? await stripe.subscriptions.retrieve(subscriptionId)
           : null;
 
-        // Update user's subscription
         await supabase
           .from("profiles")
           .update({
@@ -77,7 +78,6 @@ export async function POST(request: NextRequest) {
           })
           .eq("user_id", userId);
 
-        // Track payment event
         await supabase
           .from("payment_events")
           .insert({
@@ -97,7 +97,6 @@ export async function POST(request: NextRequest) {
           ? await stripe.subscriptions.retrieve(invoiceSubscriptionId)
           : null;
 
-        // Update subscription status
         await supabase
           .from("profiles")
           .update({
@@ -113,7 +112,6 @@ export async function POST(request: NextRequest) {
         const invoice = event.data.object as Stripe.Invoice;
         const invoiceSubscriptionId = getInvoiceSubscriptionId(invoice);
 
-        // Update subscription status
         await supabase
           .from("profiles")
           .update({
@@ -127,7 +125,6 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.deleted": {
         const subscription = event.data.object;
 
-        // Downgrade to free tier
         await supabase
           .from("profiles")
           .update({
