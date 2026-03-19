@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const TournamentPatchSchema = z
+  .object({
+    status: z.enum(["upcoming", "registration", "live", "completed", "cancelled"]).optional(),
+    name: z.string().trim().min(3).max(100).optional(),
+    description: z.string().trim().max(500).nullable().optional(),
+    registration_closes: z.string().datetime().optional(),
+    starts_at: z.string().datetime().optional(),
+    ends_at: z.string().datetime().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.registration_closes && value.starts_at) {
+      const registrationCloses = new Date(value.registration_closes);
+      const startsAt = new Date(value.starts_at);
+      if (registrationCloses >= startsAt) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["registration_closes"],
+          message: "Registration must close before the tournament starts",
+        });
+      }
+    }
+  });
 
 type ParticipantRow = {
   id: string;
@@ -102,11 +126,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const role = user.app_metadata?.role ?? "user";
   if (role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = await req.json();
-  const allowed = ["status", "name", "description", "registration_closes", "starts_at", "prize_structure", "ends_at"];
+  const body = await req.json().catch(() => ({}));
+  const parsed = TournamentPatchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
+  }
+
   const updates: Record<string, unknown> = {};
-  for (const key of allowed) {
-    if (key in body) updates[key] = body[key];
+  for (const [key, value] of Object.entries(parsed.data)) {
+    if (typeof value !== "undefined") {
+      updates[key] = value;
+    }
   }
 
   const { data, error } = await supabase.from("tournaments").update(updates).eq("id", id).select().single();

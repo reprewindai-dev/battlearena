@@ -32,11 +32,11 @@ export async function POST(
     return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
   }
 
-  if (!["upcoming", "registration"].includes(tournament.status)) {
+  if (tournament.status !== "registration") {
     return NextResponse.json({ error: "Registration is closed" }, { status: 400 });
   }
 
-  if (new Date(tournament.registration_closes) < new Date()) {
+  if (tournament.registration_closes && new Date(tournament.registration_closes) < new Date()) {
     return NextResponse.json({ error: "Registration deadline passed" }, { status: 400 });
   }
 

@@ -37,10 +37,12 @@ const statusColors: Record<TournamentStatus, string> = {
 
 export function TournamentCard({ tournament, onJoin, onView, isJoining }: TournamentCardProps) {
   const currentParticipants = tournament.participant_count?.[0]?.count ?? 0;
+  const registrationDeadlinePassed =
+    tournament.registration_closes ? new Date(tournament.registration_closes).getTime() <= Date.now() : false;
   const canJoin =
-    tournament.status === "upcoming" || tournament.status === "registration"
-      ? currentParticipants < tournament.max_participants
-      : false;
+    tournament.status === "registration" &&
+    !registrationDeadlinePassed &&
+    currentParticipants < tournament.max_participants;
 
   return (
     <Card className="relative">

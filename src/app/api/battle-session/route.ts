@@ -133,6 +133,11 @@ export async function GET(req: Request) {
     };
   });
 
+  const isParticipant = hydratedParticipants.some((participant) => participant.user_id === user.id);
+  if (!isParticipant && battle.created_by !== user.id && !isModOrAdmin(role)) {
+    return NextResponse.json({ error: "not_participant" }, { status: 403 });
+  }
+
   const session: BattleSession = {
     id: battle.id,
     created_by: battle.created_by,

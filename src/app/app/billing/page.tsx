@@ -27,6 +27,7 @@ export default function BillingPage() {
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isUpgrading, setIsUpgrading] = React.useState(false);
+  const [isOpeningPortal, setIsOpeningPortal] = React.useState(false);
 
   const supabase = createSupabaseBrowserClient();
 
@@ -90,6 +91,26 @@ export default function BillingPage() {
       toast.error(error instanceof Error ? error.message : "Failed to create subscription");
     } finally {
       setIsUpgrading(false);
+    }
+  }
+
+  async function handleOpenBillingPortal() {
+    setIsOpeningPortal(true);
+    try {
+      const response = await fetch("/api/subscriptions/portal", {
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => null)) as { error?: string; url?: string } | null;
+      if (!response.ok || !data?.url) {
+        throw new Error(data?.error ?? "Failed to open billing portal");
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      console.error("Failed to open billing portal:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to open billing portal");
+    } finally {
+      setIsOpeningPortal(false);
     }
   }
 
@@ -200,10 +221,10 @@ export default function BillingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Billing Management</CardTitle>
-            <CardDescription>Stripe portal wiring still needs to be connected to the canonical billing profile.</CardDescription>
+            <CardDescription>Manage your active subscription, payment methods, and invoices in Stripe.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" disabled>
+            <Button variant="outline" onClick={handleOpenBillingPortal} disabled={isOpeningPortal}>
               Manage Billing (Stripe Portal)
             </Button>
           </CardContent>

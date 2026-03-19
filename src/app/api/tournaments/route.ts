@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
+
+const TournamentCreateSchema = z
+  .object({
+    name: z.string().trim().min(3).max(100),
+    description: z.string().trim().max(500).optional().or(z.literal("")),
+    format: z.enum(["single_elimination", "double_elimination", "round_robin", "swiss"]).default("single_elimination"),
+    tournament_type: z.enum(["open", "invite_only"]).default("open"),
+    max_participants: z.number().int().min(4).max(64).default(16),
+    entry_fee_tokens: z.number().int().min(0).max(1_000_000).default(0),
+    prize_pool_tokens: z.number().int().min(0).max(10_000_000).default(0),
+    starts_at: z.string().datetime(),
+    registration_ends_at: z.string().datetime(),
+  })
+  .superRefine((value, ctx) => {
+    const startsAt = new Date(value.starts_at);
+    const registrationEndsAt = new Date(value.registration_ends_at);
+
+    if (Number.isNaN(startsAt.getTime())) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["starts_at"], message: "Invalid start date" });
+    }
+    if (Number.isNaN(registrationEndsAt.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registration_ends_at"],
+        message: "Invalid registration close date",
+      });
+    }
+    if (!Number.isNaN(startsAt.getTime()) && !Number.isNaN(registrationEndsAt.getTime()) && registrationEndsAt >= startsAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registration_ends_at"],
+        message: "Registration must close before the tournament starts",
+      });
+    }
+  });
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -83,36 +119,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json();
-  const {
-    name,
-    description,
-    format = "single_elimination",
-    tournament_type = "open",
-    max_participants = 16,
-    entry_fee_tokens = 0,
-    prize_pool_tokens = 0,
-    starts_at,
-    registration_ends_at,
-  } = body;
+  const body = await req.json().catch(() => ({}));
+  const parsed = TournamentCreateSchema.safeParse({
+    ...body,
+    max_participants: Number(body?.max_participants ?? 16),
+    entry_fee_tokens: Number(body?.entry_fee_tokens ?? 0),
+    prize_pool_tokens: Number(body?.prize_pool_tokens ?? 0),
+  });
 
-  if (!name || !starts_at || !registration_ends_at) {
-    return NextResponse.json({ error: "name, starts_at, registration_ends_at required" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
   }
+
+  const registrationOpens = new Date().toISOString();
+  const status = "registration";
 
   const { data, error } = await supabase
     .from("tournaments")
     .insert({
-      name: String(name).slice(0, 100),
-      description: description ? String(description).slice(0, 500) : null,
-      format,
-      tournament_type,
-      max_participants: Number(max_participants),
-      entry_fee_tokens: Number(entry_fee_tokens),
-      prize_pool_tokens: Number(prize_pool_tokens),
-      starts_at,
-      registration_closes: registration_ends_at,
-      registration_opens: new Date().toISOString(),
+      name: parsed.data.name,
+      description: parsed.data.description ? parsed.data.description : null,
+      format: parsed.data.format,
+      tournament_type: parsed.data.tournament_type,
+      max_participants: parsed.data.max_participants,
+      entry_fee_tokens: parsed.data.entry_fee_tokens,
+      prize_pool_tokens: parsed.data.prize_pool_tokens,
+      starts_at: parsed.data.starts_at,
+      registration_closes: parsed.data.registration_ends_at,
+      registration_opens: registrationOpens,
+      status,
       created_by: user.id,
     })
     .select()
