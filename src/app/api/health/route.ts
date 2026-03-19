@@ -7,8 +7,12 @@ function isConfigured(value: string | undefined) {
 }
 
 export async function GET() {
+  const supabasePublicKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+
   const checks = {
-    supabase: isConfigured(process.env.NEXT_PUBLIC_SUPABASE_URL) && isConfigured(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    supabase: isConfigured(process.env.NEXT_PUBLIC_SUPABASE_URL) && isConfigured(supabasePublicKey),
     livekit:
       isConfigured(process.env.NEXT_PUBLIC_LIVEKIT_URL) &&
       isConfigured(process.env.LIVEKIT_API_KEY) &&
