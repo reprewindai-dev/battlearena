@@ -404,14 +404,14 @@ export function BattleRoomCockpit() {
   const battleStatus = sessionMeta?.status ?? "--";
   const statusBadge =
     battleStatus === "live"
-      ? { label: `LIVE (${sessionMode ?? "â€¦"})`, className: "bg-emerald-500/15 text-emerald-200" }
+      ? { label: `LIVE (${sessionMode ?? "..."})`, className: "bg-emerald-500/15 text-emerald-200" }
       : battleStatus === "queued" || battleStatus === "draft"
-        ? { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "â€¦"})`, className: "bg-amber-500/15 text-amber-200" }
+        ? { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "..."})`, className: "bg-amber-500/15 text-amber-200" }
         : battleStatus === "complete"
-          ? { label: `COMPLETE (${sessionMode ?? "â€¦"})`, className: "bg-slate-500/20 text-slate-200" }
+          ? { label: `COMPLETE (${sessionMode ?? "..."})`, className: "bg-slate-500/20 text-slate-200" }
           : battleStatus === "canceled"
-            ? { label: `CANCELED (${sessionMode ?? "â€¦"})`, className: "bg-slate-500/20 text-slate-200" }
-            : { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "â€¦"})`, className: "bg-slate-500/20 text-slate-200" };
+            ? { label: `CANCELED (${sessionMode ?? "..."})`, className: "bg-slate-500/20 text-slate-200" }
+            : { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "..."})`, className: "bg-slate-500/20 text-slate-200" };
 
   function leaveBattle() {
     clearStoredSession();
