@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
+
+const VALID_STATUSES = ["open", "in_review", "resolved", "escalated", "closed"] as const;
+const VALID_ACTIONS = ["warn", "mute", "ban", "remove_content", "dismiss", "escalate", "close", "note"] as const;
+const updateModerationCaseSchema = z
+  .object({
+    status: z.enum(VALID_STATUSES).optional(),
+    action_type: z.enum(VALID_ACTIONS).optional(),
+    action_payload: z.record(z.string(), z.unknown()).optional(),
+    note: z.string().trim().max(1000).optional(),
+  })
+  .refine(
+    (value) =>
+      typeof value.status !== "undefined" ||
+      typeof value.action_type !== "undefined" ||
+      typeof value.note !== "undefined",
+    {
+      message: "No valid moderation updates provided",
+    },
+  );
 
 // GET /api/moderation/cases/[id] — case detail with actions
 export async function GET(
@@ -52,18 +73,18 @@ export async function PATCH(
   const supabase = await createSupabaseServerClient();
   if (!supabase) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
 
-  const body = await req.json();
-  const { status, action_type, action_payload, note } = body;
+  const body = await req.json().catch(() => ({}));
+  const parsed = updateModerationCaseSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const { status, action_type, action_payload, note } = parsed.data;
 
-  const VALID_STATUSES = ["open", "in_review", "resolved", "escalated", "closed"];
-  const VALID_ACTIONS = ["warn", "mute", "ban", "remove_content", "dismiss", "escalate", "close", "note"];
+  const adminClient = createSupabaseServiceRoleClient();
 
   // Update case status
   if (status) {
-    if (!VALID_STATUSES.includes(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-    }
-    const { error } = await supabase
+    const { error } = await adminClient
       .from("moderation_cases")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id);
@@ -74,11 +95,7 @@ export async function PATCH(
   // Record moderation action
   const actionToRecord = action_type ?? (status ? `status_${status}` : null);
   if (actionToRecord) {
-    if (!VALID_ACTIONS.includes(actionToRecord) && !actionToRecord.startsWith("status_")) {
-      return NextResponse.json({ error: "Invalid action_type" }, { status: 400 });
-    }
-
-    const { error: actionError } = await supabase
+    const { error: actionError } = await adminClient
       .from("moderation_actions")
       .insert({
         case_id: id,
@@ -95,8 +112,19 @@ export async function PATCH(
     }
   }
 
+  await adminClient.from("admin_audit_log").insert({
+    actor_user_id: user.id,
+    action: "moderation_case_update",
+    payload: {
+      case_id: id,
+      status: status ?? null,
+      action_type: actionToRecord,
+      note: note ?? null,
+    },
+  });
+
   // Re-fetch updated case
-  const { data: updated } = await supabase
+  const { data: updated } = await adminClient
     .from("moderation_cases")
     .select("*")
     .eq("id", id)

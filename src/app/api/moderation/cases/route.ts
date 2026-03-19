@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
+
+const CASE_STATUSES = ["open", "in_review", "resolved", "escalated", "closed"] as const;
+const createModerationCaseSchema = z
+  .object({
+    subject_user_id: z.string().uuid().optional().nullable(),
+    battle_id: z.string().uuid().optional().nullable(),
+    reason: z.string().trim().min(10).max(1000),
+  })
+  .refine((value) => Boolean(value.subject_user_id || value.battle_id), {
+    message: "Must specify subject_user_id or battle_id",
+  });
 
 function requireModOrAdmin(role: string) {
   return role === "mod" || role === "admin";
@@ -21,6 +34,10 @@ export async function GET(req: NextRequest) {
   const page = Math.max(0, parseInt(searchParams.get("page") ?? "0", 10));
   const limit = 25;
   const offset = page * limit;
+
+  if (status !== "all" && !CASE_STATUSES.includes(status as (typeof CASE_STATUSES)[number])) {
+    return NextResponse.json({ error: "invalid_status" }, { status: 400 });
+  }
 
   let query = supabase
     .from("moderation_cases")
@@ -63,24 +80,33 @@ export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
 
-  const body = await req.json();
-  const { subject_user_id, battle_id, reason } = body;
-
-  if (!reason || typeof reason !== "string" || reason.trim().length < 10) {
-    return NextResponse.json({ error: "Reason must be at least 10 characters" }, { status: 400 });
+  const { data: authData } = await supabase.auth.getUser();
+  if (!authData.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!subject_user_id && !battle_id) {
-    return NextResponse.json({ error: "Must specify subject_user_id or battle_id" }, { status: 400 });
+  try {
+    await ensurePublicUserRecord(supabase, authData.user);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "user_bootstrap_failed" },
+      { status: 400 },
+    );
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const parsed = createModerationCaseSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from("moderation_cases")
     .insert({
       created_by: user.id,
-      subject_user_id: subject_user_id ?? null,
-      battle_id: battle_id ?? null,
-      reason: reason.trim(),
+      subject_user_id: parsed.data.subject_user_id ?? null,
+      battle_id: parsed.data.battle_id ?? null,
+      reason: parsed.data.reason,
       status: "open",
     })
     .select()
