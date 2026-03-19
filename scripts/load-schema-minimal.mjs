@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { createSupabasePgClient } from "./lib/supabase-pg-client.mjs";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -6,18 +6,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { Client } = pg;
-
 async function loadMinimalSchema() {
-  const client = new Client({
-    host: 'aws-1-us-east-1.pooler.supabase.com',
-    port: 6543,
-    database: 'postgres',
-    user: 'postgres.xjnxrkdtdfvusofiwshu',
-    password: 'kys48wlXoYWDbOEL',
-    ssl: { rejectUnauthorized: false },
+  const client = createSupabasePgClient({
     connectionTimeoutMillis: 10000,
-    query_timeout: 30000
+    query_timeout: 30000,
   });
 
   try {

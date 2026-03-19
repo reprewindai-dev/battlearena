@@ -42,6 +42,21 @@ export async function POST(
     return NextResponse.json({ error: "crew_not_found" }, { status: 404 });
   }
 
+  const { data: existingMembership, error: existingMembershipError } = await supabase
+    .from("crew_members")
+    .select("id,role")
+    .eq("crew_id", crewId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingMembershipError) {
+    return NextResponse.json({ error: existingMembershipError.message }, { status: 400 });
+  }
+
+  if (existingMembership) {
+    return NextResponse.json({ ok: true, alreadyJoined: true });
+  }
+
   const { data: currentMembers } = await supabase
     .from("crew_members")
     .select("id")
@@ -60,7 +75,7 @@ export async function POST(
     return NextResponse.json({ error: joinError.message }, { status: 400 });
   }
 
-  const nextCount = Math.max(crew.member_count ?? 0, (currentMembers?.length ?? 0) + 1);
+  const nextCount = Math.max(crew.member_count ?? 0, currentMembers?.length ?? 0) + 1;
   await supabase.from("crews").update({ member_count: nextCount }).eq("id", crewId);
 
   return NextResponse.json({ ok: true });

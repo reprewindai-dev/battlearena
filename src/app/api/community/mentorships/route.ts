@@ -75,6 +75,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    await ensurePublicUserRecord(supabase, user);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "user_bootstrap_failed" },
+      { status: 400 },
+    );
+  }
+
   const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
   const mentorHandle = typeof body.mentorHandle === "string" ? body.mentorHandle.trim().toLowerCase() : "";
   const note = typeof body.note === "string" ? body.note.trim() : null;

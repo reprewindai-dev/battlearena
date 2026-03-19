@@ -44,14 +44,13 @@
     "src/**/*.tsx",
     "src/**/*.mts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".next/dev/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
+    ".next",
     "arena-web",
     "apps",
-    ".next/dev",
     "battlearena",
     "windsurf-project-3",
     "package.monorepo.json",

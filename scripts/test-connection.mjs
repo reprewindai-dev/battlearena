@@ -1,18 +1,10 @@
-import pg from 'pg';
-
-const { Client } = pg;
+import { createSupabasePgClient } from "./lib/supabase-pg-client.mjs";
 
 async function testConnection() {
   console.log('🔍 Testing Supabase connection...');
   
-  const client = new Client({
-    host: 'aws-1-us-east-1.pooler.supabase.com',
-    port: 6543,
-    database: 'postgres',
-    user: 'postgres.xjnxrkdtdfvusofiwshu',
-    password: 'kys48wlXoYWDbOEL',
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 5000
+  const client = createSupabasePgClient({
+    connectionTimeoutMillis: 5000,
   });
 
   try {

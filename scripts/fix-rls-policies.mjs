@@ -1,17 +1,9 @@
-import pg from 'pg';
-
-const { Client } = pg;
+import { createSupabasePgClient } from "./lib/supabase-pg-client.mjs";
 
 async function fixRLSPolicies() {
-  const client = new Client({
-    host: 'aws-1-us-east-1.pooler.supabase.com',
-    port: 6543,
-    database: 'postgres',
-    user: 'postgres.xjnxrkdtdfvusofiwshu',
-    password: 'kys48wlXoYWDbOEL',
-    ssl: { rejectUnauthorized: false },
+  const client = createSupabasePgClient({
     connectionTimeoutMillis: 10000,
-    query_timeout: 30000
+    query_timeout: 30000,
   });
 
   try {

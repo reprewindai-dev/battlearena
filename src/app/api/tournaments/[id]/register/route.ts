@@ -40,6 +40,20 @@ export async function POST(
     return NextResponse.json({ error: "Registration deadline passed" }, { status: 400 });
   }
 
+  const { data: existingParticipant, error: existingParticipantError } = await supabase
+    .from("tournament_participants")
+    .select("id,status")
+    .eq("tournament_id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (existingParticipantError) {
+    return NextResponse.json({ error: existingParticipantError.message }, { status: 500 });
+  }
+  if (existingParticipant) {
+    return NextResponse.json({ error: "Already registered" }, { status: 409 });
+  }
+
   // Check current participant count
   const { count } = await supabase
     .from("tournament_participants")
@@ -63,14 +77,18 @@ export async function POST(
       return NextResponse.json({ error: "Insufficient tokens" }, { status: 400 });
     }
 
-    await supabase
+    const { error: walletError } = await supabase
       .from("wallets")
       .upsert(
         { user_id: user.id, crowns_balance: balance - tournament.entry_fee_tokens },
         { onConflict: "user_id" },
       );
 
-    await supabase.from("token_transactions").insert({
+    if (walletError) {
+      return NextResponse.json({ error: walletError.message }, { status: 500 });
+    }
+
+    const { error: txError } = await supabase.from("token_transactions").insert({
       user_id: user.id,
       recipient_id: tournament.created_by,
       tokens_spent: tournament.entry_fee_tokens,
@@ -79,6 +97,10 @@ export async function POST(
       transaction_type: "tournament_entry_fee",
       reference_id: id,
     });
+
+    if (txError) {
+      return NextResponse.json({ error: txError.message }, { status: 500 });
+    }
   }
 
   const { data, error } = await supabase
@@ -89,6 +111,30 @@ export async function POST(
 
   if (error) {
     if (error.code === "23505") {
+      if (tournament.entry_fee_tokens > 0) {
+        const { data: latestWallet } = await supabase
+          .from("wallets")
+          .select("crowns_balance")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        await supabase
+          .from("wallets")
+          .upsert(
+            {
+              user_id: user.id,
+              crowns_balance: (latestWallet?.crowns_balance ?? 0) + tournament.entry_fee_tokens,
+            },
+            { onConflict: "user_id" },
+          );
+
+        await supabase
+          .from("token_transactions")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("reference_id", id)
+          .eq("transaction_type", "tournament_entry_fee");
+      }
       return NextResponse.json({ error: "Already registered" }, { status: 409 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
