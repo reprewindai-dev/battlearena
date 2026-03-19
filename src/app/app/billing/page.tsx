@@ -6,17 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
-import { PLANS, type PlanType } from "@/lib/billing/stripe";
+import type { SubscriptionPlanId } from "@/lib/payments/catalog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 
 type UserProfile = {
-  subscription_tier: PlanType;
-  subscription_status: string | null;
-  subscription_ends_at: string | null;
-  battles_used_this_month: number;
-  api_usage_count: number;
+  active_subscription_plan: SubscriptionPlanId | null;
+  active_subscription_status: string | null;
+  subscription_current_period_end: string | null;
   stripe_customer_id: string | null;
+};
+
+const PLAN_LIMITS: Record<SubscriptionPlanId, { battlesPerMonth: string; apiCallsPerMonth: string }> = {
+  spectator: { battlesPerMonth: "Watch-only", apiCallsPerMonth: "Basic" },
+  pro: { battlesPerMonth: "Unlimited", apiCallsPerMonth: "10,000" },
+  premium: { battlesPerMonth: "Unlimited", apiCallsPerMonth: "Unlimited" },
 };
 
 export default function BillingPage() {
@@ -33,12 +37,17 @@ export default function BillingPage() {
         if (!user) return;
 
         const { data: profile } = await supabase
-          .from("profiles")
-          .select("subscription_tier, subscription_status, subscription_ends_at, battles_used_this_month, api_usage_count, stripe_customer_id")
+          .from("user_billing_profiles")
+          .select("active_subscription_plan, active_subscription_status, subscription_current_period_end, stripe_customer_id")
           .eq("user_id", user.id)
-          .single();
+          .maybeSingle();
 
-        setProfile(profile);
+        setProfile(profile ?? {
+          active_subscription_plan: null,
+          active_subscription_status: null,
+          subscription_current_period_end: null,
+          stripe_customer_id: null,
+        });
       } catch (error) {
         console.error("Failed to load profile:", error);
       } finally {
@@ -49,30 +58,36 @@ export default function BillingPage() {
     loadProfile();
   }, [supabase]);
 
-  async function handleUpgrade(plan: PlanType) {
+  async function handleUpgrade(plan: SubscriptionPlanId) {
     setIsUpgrading(true);
     try {
-      const response = await fetch("/api/billing/checkout", {
+      const response = await fetch("/api/subscriptions/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ planType: plan }),
+        body: JSON.stringify({ plan_id: plan }),
       });
 
-      const data = (await response.json().catch(() => null)) as { error?: string; url?: string } | null;
+      const data = (await response.json().catch(() => null)) as { error?: string; client_secret?: string | null; status?: string } | null;
       if (!response.ok) {
-        throw new Error(data?.error ?? "Failed to create checkout session");
+        throw new Error(data?.error ?? "Failed to create subscription");
       }
-      const checkoutUrl = data?.url;
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+
+      if (data?.status === "active") {
+        toast.success("Subscription activated.");
         return;
       }
-      throw new Error("Checkout session did not return a URL");
+
+      if (data?.client_secret) {
+        toast.success("Subscription created. Complete payment in Stripe Elements flow.");
+        return;
+      }
+
+      toast.success("Subscription request created.");
     } catch (error) {
-      console.error("Failed to create checkout session:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create checkout session");
+      console.error("Failed to create subscription:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to create subscription");
     } finally {
       setIsUpgrading(false);
     }
@@ -106,8 +121,9 @@ export default function BillingPage() {
     );
   }
 
-  const currentPlan = profile.subscription_tier;
-  const planLimits = PLANS[currentPlan].limits;
+  const currentPlan = profile.active_subscription_plan;
+  const currentPlanForDisplay = currentPlan ?? "spectator";
+  const planLimits = PLAN_LIMITS[currentPlanForDisplay];
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -121,8 +137,8 @@ export default function BillingPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Current Plan
-            <Badge variant={currentPlan === "free" ? "secondary" : "default"}>
-              {PLANS[currentPlan].name}
+            <Badge variant={currentPlan ? "default" : "secondary"}>
+              {currentPlan ? currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) : "No Active Plan"}
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -131,14 +147,14 @@ export default function BillingPage() {
             <div>
               <p className="text-sm font-medium">Status</p>
               <p className="text-sm text-muted-foreground capitalize">
-                {profile.subscription_status || "Active"}
+                {profile.active_subscription_status || "inactive"}
               </p>
             </div>
-            {profile.subscription_ends_at && (
+            {profile.subscription_current_period_end && (
               <div>
                 <p className="text-sm font-medium">Renews</p>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(profile.subscription_ends_at).toLocaleDateString()}
+                  {new Date(profile.subscription_current_period_end).toLocaleDateString()}
                 </p>
               </div>
             )}
@@ -148,17 +164,15 @@ export default function BillingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium">Battles This Month</p>
+              <p className="text-sm font-medium">Battle Access</p>
               <p className="text-sm text-muted-foreground">
-                {profile.battles_used_this_month}
-                {planLimits.battlesPerMonth > 0 ? ` / ${planLimits.battlesPerMonth}` : " (Unlimited)"}
+                {planLimits.battlesPerMonth}
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium">API Calls This Month</p>
+              <p className="text-sm font-medium">API Access</p>
               <p className="text-sm text-muted-foreground">
-                {profile.api_usage_count}
-                {planLimits.apiCallsPerMonth > 0 ? ` / ${planLimits.apiCallsPerMonth}` : " (Unlimited)"}
+                {planLimits.apiCallsPerMonth}
               </p>
             </div>
           </div>
@@ -169,10 +183,10 @@ export default function BillingPage() {
       <div>
         <h2 className="text-2xl font-bold mb-4">Upgrade Your Plan</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {Object.entries(PLANS).map(([planType]) => (
+          {(["spectator", "pro", "premium"] as const).map((planType) => (
             <SubscriptionCard
               key={planType}
-              plan={planType as PlanType}
+              plan={planType}
               currentPlan={currentPlan}
               onUpgrade={handleUpgrade}
               isLoading={isUpgrading}
@@ -186,7 +200,7 @@ export default function BillingPage() {
         <Card>
           <CardHeader>
             <CardTitle>Billing Management</CardTitle>
-            <CardDescription>Manage your payment methods and billing history</CardDescription>
+            <CardDescription>Stripe portal wiring still needs to be connected to the canonical billing profile.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button variant="outline" disabled>

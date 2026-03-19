@@ -88,13 +88,20 @@ export async function middleware(req: NextRequest) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("subscription_tier, battles_used_this_month")
+      const { data: billingProfile } = await supabaseAdmin
+        .from("user_billing_profiles")
+        .select("active_subscription_plan,active_subscription_status")
         .eq("user_id", session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (profile?.subscription_tier === "free") {
+      const activePlan =
+        billingProfile &&
+        (billingProfile.active_subscription_status === "active" ||
+          billingProfile.active_subscription_status === "trialing")
+          ? billingProfile.active_subscription_plan
+          : null;
+
+      if (!activePlan || activePlan === "spectator") {
         const { data: usage } = await supabaseAdmin
           .from("usage_tracking")
           .select("id")

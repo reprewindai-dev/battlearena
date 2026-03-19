@@ -38,26 +38,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's subscription tier
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("subscription_tier")
+    const { data: billingProfile } = await supabase
+      .from("user_billing_profiles")
+      .select("active_subscription_plan,active_subscription_status")
       .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
-    if (!profile) {
-      return NextResponse.json({ allowed: false, reason: "Profile not found" });
-    }
+    const activePlan =
+      billingProfile &&
+      (billingProfile.active_subscription_status === "active" ||
+        billingProfile.active_subscription_status === "trialing")
+        ? billingProfile.active_subscription_plan
+        : null;
 
-    // Enterprise has unlimited access
-    if (profile.subscription_tier === "enterprise") {
+    if (activePlan === "premium") {
       return NextResponse.json({ allowed: true });
     }
 
-    // Pro has access to most features
-    if (profile.subscription_tier === "pro") {
+    if (activePlan === "pro") {
       if (event_type === "tournament_created") {
-        return NextResponse.json({ allowed: false, reason: "Tournaments require Enterprise plan" });
+        return NextResponse.json({ allowed: false, reason: "Tournaments require Premium plan" });
       }
       return NextResponse.json({ allowed: true });
     }
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     if (event_type === "tournament_created") {
       return NextResponse.json({
         allowed: false,
-        reason: "Tournaments require Enterprise plan",
+        reason: "Tournaments require Premium plan",
       });
     }
 

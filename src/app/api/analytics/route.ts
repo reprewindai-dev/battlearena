@@ -55,28 +55,18 @@ export async function GET() {
       return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
     }
 
-    const [profileRes, billingProfileRes] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("subscription_tier")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      supabase
-        .from("user_billing_profiles")
-        .select("active_subscription_plan,active_subscription_status")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
+    const { data: billingProfile } = await supabase
+      .from("user_billing_profiles")
+      .select("active_subscription_plan,active_subscription_status")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    const tier = profileRes.data?.subscription_tier ?? "free";
-    const billingPlan = billingProfileRes.data?.active_subscription_plan ?? null;
-    const billingStatus = billingProfileRes.data?.active_subscription_status ?? null;
+    const billingPlan = billingProfile?.active_subscription_plan ?? null;
+    const billingStatus = billingProfile?.active_subscription_status ?? null;
 
     const hasAnalyticsAccess =
-      tier === "pro" ||
-      tier === "enterprise" ||
-      ((billingPlan === "pro" || billingPlan === "enterprise") &&
-        (billingStatus === "active" || billingStatus === "trialing"));
+      (billingPlan === "pro" || billingPlan === "premium") &&
+      (billingStatus === "active" || billingStatus === "trialing");
 
     if (!hasAnalyticsAccess) {
       return NextResponse.json({ error: "Analytics requires Pro plan" }, { status: 403 });
