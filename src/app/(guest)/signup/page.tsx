@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { z } from "zod";
 
@@ -38,9 +38,24 @@ export default function SignupPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
+      const nextParam =
+        typeof window === "undefined"
+          ? null
+          : new URLSearchParams(window.location.search).get("next");
+      const safeNextPath =
+        nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+          ? nextParam
+          : "/app";
+      const emailRedirectTo =
+        typeof window === "undefined"
+          ? undefined
+          : `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNextPath)}`;
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: parsed.data.email,
         password: parsed.data.password,
+        options: {
+          emailRedirectTo,
+        },
       });
       if (signUpError) {
         setError(signUpError.message);
@@ -48,7 +63,7 @@ export default function SignupPage() {
       }
 
       if (data.session) {
-        router.push("/app");
+        router.push(safeNextPath);
         router.refresh();
         return;
       }
