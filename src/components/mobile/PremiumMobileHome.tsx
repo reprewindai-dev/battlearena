@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   PremiumMobileLayout, 
   MobileBattleCard, 
@@ -31,6 +33,7 @@ import {
 } from 'lucide-react';
 
 const PremiumMobileHomePage: React.FC = () => {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -246,8 +249,8 @@ const PremiumMobileHomePage: React.FC = () => {
                 Featured Battles
               </span>
             </h2>
-            <Button variant="ghost" size="sm" className="text-white/60">
-              View All
+            <Button asChild variant="ghost" size="sm" className="text-white/60">
+              <Link href="/app/battles">View All</Link>
             </Button>
           </div>
 
@@ -261,8 +264,8 @@ const PremiumMobileHomePage: React.FC = () => {
               >
                 <MobileBattleCard
                   battle={battle}
-                  onJoin={() => console.log('Join battle:', battle.id)}
-                  onSpectate={() => console.log('Spectate battle:', battle.id)}
+                  onJoin={() => router.push(`/app/battles/room?battleId=${encodeURIComponent(battle.id)}`)}
+                  onSpectate={() => router.push(`/app/battles/room?battleId=${encodeURIComponent(battle.id)}`)}
                 />
               </motion.div>
             ))}
@@ -278,8 +281,8 @@ const PremiumMobileHomePage: React.FC = () => {
                 Trending Beats
               </span>
             </h2>
-            <Button variant="ghost" size="sm" className="text-white/60">
-              Browse All
+            <Button asChild variant="ghost" size="sm" className="text-white/60">
+              <Link href="/app/beats">Browse All</Link>
             </Button>
           </div>
 
@@ -294,8 +297,8 @@ const PremiumMobileHomePage: React.FC = () => {
                 <MobileBeatCard
                   beat={beat}
                   isPlaying={false}
-                  onPlayToggle={() => console.log('Play beat:', beat.id)}
-                  onSelect={() => console.log('Select beat:', beat.id)}
+                  onPlayToggle={() => router.push('/app/beats')}
+                  onSelect={() => router.push('/app/beats')}
                 />
               </motion.div>
             ))}
@@ -305,13 +308,17 @@ const PremiumMobileHomePage: React.FC = () => {
         {/* Quick Actions */}
         <section className="px-4">
           <div className="grid grid-cols-2 gap-3">
-            <Button className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
-              <Swords className="w-5 h-5" />
-              Start Battle
+            <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+              <Link href="/app/battles">
+                <Swords className="w-5 h-5" />
+                Start Battle
+              </Link>
             </Button>
-            <Button className="bg-white/10 backdrop-blur-sm border border-white/20 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
-              <Video className="w-5 h-5" />
-              Watch Live
+            <Button asChild className="bg-white/10 backdrop-blur-sm border border-white/20 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+              <Link href="/app/battles/room">
+                <Video className="w-5 h-5" />
+                Watch Live
+              </Link>
             </Button>
           </div>
         </section>
@@ -325,8 +332,8 @@ const PremiumMobileHomePage: React.FC = () => {
                 Top Battlers
               </span>
             </h2>
-            <Button variant="ghost" size="sm" className="text-white/60">
-              View All
+            <Button asChild variant="ghost" size="sm" className="text-white/60">
+              <Link href="/app/community">View All</Link>
             </Button>
           </div>
 
@@ -373,11 +380,11 @@ const PremiumMobileHomePage: React.FC = () => {
                 Join thousands of battlers in the ultimate hip-hop arena
               </p>
               <div className="flex flex-col gap-3">
-                <Button className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-3 rounded-full">
-                  Start Your First Battle
+                <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-3 rounded-full">
+                  <Link href="/app/battles">Start Your First Battle</Link>
                 </Button>
-                <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 py-3 rounded-full">
-                  Watch Live Battles
+                <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10 py-3 rounded-full">
+                  <Link href="/app/battles/room">Watch Live Battles</Link>
                 </Button>
               </div>
             </CardContent>
