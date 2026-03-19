@@ -1,6 +1,16 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getHydratedProfile } from "@/lib/community/profile";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
+
+const UpdateProfileSchema = z.object({
+  handle: z.string().trim().toLowerCase().regex(/^[a-z0-9_]{3,30}$/).optional(),
+  display_name: z.string().trim().max(80).nullable().optional(),
+  bio: z.string().trim().max(280).nullable().optional(),
+  avatar_url: z.string().trim().url().max(500).nullable().optional(),
+});
 
 export async function GET(
   _req: NextRequest,
@@ -12,13 +22,8 @@ export async function GET(
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
 
-  const [{ data: userRow, error: userError }, { data: profileRow }, { data: ratingRow }] = await Promise.all([
-    supabase.from("users").select("id,username,is_verified,is_banned,created_at").eq("id", userId).maybeSingle(),
-    supabase.from("user_profiles").select("display_name,bio,avatar_url,tier,battle_stats,reputation_score").eq("user_id", userId).maybeSingle(),
-    supabase.from("user_ratings").select("rating,tier,wins,losses").eq("user_id", userId).maybeSingle(),
-  ]);
-
-  if (userError || !userRow || userRow.is_banned) {
+  const hydratedProfile = await getHydratedProfile(supabase, userId);
+  if (!hydratedProfile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
@@ -38,20 +43,8 @@ export async function GET(
     : { data: [] as Array<Record<string, unknown>> };
 
   return NextResponse.json({
-    profile: {
-      id: userRow.id,
-      handle: userRow.username,
-      display_name: profileRow?.display_name ?? null,
-      bio: profileRow?.bio ?? null,
-      avatar_url: profileRow?.avatar_url ?? null,
-      is_verified: Boolean(userRow.is_verified),
-      elo_rating: ratingRow?.rating ?? 1000,
-      tier: ratingRow?.tier ?? profileRow?.tier ?? "bronze",
-      wins: ratingRow?.wins ?? 0,
-      losses: ratingRow?.losses ?? 0,
-      created_at: userRow.created_at,
-    },
-    achievements: [],
+    profile: hydratedProfile.profile,
+    achievements: hydratedProfile.achievements,
     recent_battles: battles ?? [],
   });
 }
@@ -76,26 +69,40 @@ export async function PATCH(
     return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
   }
 
-  const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
-  const allowed = ["handle", "display_name", "bio", "avatar_url"] as const;
-  type AllowedField = typeof allowed[number];
-  const update: Partial<Record<AllowedField, string>> = {};
+  const body = await req.json().catch(() => ({}));
+  const parsed = UpdateProfileSchema.safeParse({
+    handle:
+      typeof (body as { handle?: unknown }).handle === "string"
+        ? (body as { handle: string }).handle.trim().toLowerCase()
+        : undefined,
+    display_name:
+      typeof (body as { display_name?: unknown }).display_name === "string"
+        ? (body as { display_name: string }).display_name.trim()
+        : (body as { display_name?: null }).display_name === null
+          ? null
+          : undefined,
+    bio:
+      typeof (body as { bio?: unknown }).bio === "string"
+        ? (body as { bio: string }).bio.trim()
+        : (body as { bio?: null }).bio === null
+          ? null
+          : undefined,
+    avatar_url:
+      typeof (body as { avatar_url?: unknown }).avatar_url === "string"
+        ? (body as { avatar_url: string }).avatar_url.trim()
+        : (body as { avatar_url?: null }).avatar_url === null
+          ? null
+          : undefined,
+  });
 
-  for (const key of allowed) {
-    if (body[key] !== undefined) update[key] = String(body[key]).slice(0, 500);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
   }
 
-  if (update.handle) {
-    // Validate handle: alphanumeric + underscore, 3-30 chars
-    if (!/^[a-zA-Z0-9_]{3,30}$/.test(update.handle)) {
-      return NextResponse.json({ error: "Invalid handle format" }, { status: 400 });
-    }
-  }
-
-  if (update.handle) {
+  if (parsed.data.handle) {
     const { error: handleError } = await supabase
       .from("users")
-      .update({ username: update.handle.toLowerCase() })
+      .update({ username: parsed.data.handle })
       .eq("id", userId);
     if (handleError) {
       if (handleError.code === "23505") {
@@ -109,21 +116,26 @@ export async function PATCH(
     .from("user_profiles")
     .upsert(
       {
-        user_id: userId,
-        display_name: update.display_name ?? null,
-        bio: update.bio ?? null,
-        avatar_url: update.avatar_url ?? null,
+        id: userId,
+        display_name: parsed.data.display_name ?? null,
+        bio: parsed.data.bio ?? null,
+        avatar_url: parsed.data.avatar_url ?? null,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id" },
+      { onConflict: "id" },
     )
-    .select()
+    .select("id")
     .single();
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ profile: data });
+  const hydratedProfile = await getHydratedProfile(supabase, userId);
+  if (!hydratedProfile) {
+    return NextResponse.json({ error: "profile_not_found_after_update" }, { status: 500 });
+  }
+
+  return NextResponse.json({ profile: hydratedProfile.profile });
 }
 
