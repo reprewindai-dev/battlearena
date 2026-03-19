@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ type ProfileRow = {
 type HistoryItem = {
   battle: BattleRow;
   opponentLabel: string;
-  outcomeLabel: "win" | "loss" | "tie" | "â€”";
+  outcomeLabel: "win" | "loss" | "tie" | "—";
 };
 
 function safeInt(value: string | null) {
@@ -46,12 +46,12 @@ function pickOpponentLabel(params: {
 }) {
   const { uid, participants, profilesByUserId } = params;
   const opp = participants.find((p: any) => p.user_id !== uid);
-  if (!opp) return "â€”";
+  if (!opp) return "—";
   const prof = profilesByUserId.get(opp.user_id);
   return (
     prof?.handle ??
     prof?.display_name ??
-    (opp.user_id.length > 10 ? `${opp.user_id.slice(0, 8)}â€¦` : opp.user_id)
+    (opp.user_id.length > 10 ? `${opp.user_id.slice(0, 8)}…` : opp.user_id)
   );
 }
 
@@ -62,7 +62,7 @@ function pickOutcomeLabel(params: {
 }): HistoryItem["outcomeLabel"] {
   const { uid, participants, result } = params;
   const viewer = participants.find((p: any) => p.user_id === uid);
-  if (!viewer) return "â€”";
+  if (!viewer) return "—";
 
   const winnerSlot =
     result && typeof result === "object" && "winner_slot" in result
@@ -264,9 +264,9 @@ export default async function BattleHistoryPage(props: {
                 <div className="min-w-[240px]">
                   <div className="font-mono text-sm text-foreground">{item.battle.id}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {item.battle.mode} Â· {item.battle.status}
+                    {item.battle.mode} · {item.battle.status}
                     {item.battle.created_at
-                      ? ` Â· ${new Date(item.battle.created_at).toLocaleString()}`
+                      ? ` · ${new Date(item.battle.created_at).toLocaleString()}`
                       : ""}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
@@ -293,7 +293,7 @@ export default async function BattleHistoryPage(props: {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
-            Page {page} of {totalPages} Â· {history.total} total
+            Page {page} of {totalPages} · {history.total} total
           </div>
           <div className="flex items-center gap-2">
             <Button asChild size="sm" variant="outline" disabled={page <= 1}>

@@ -1,4 +1,4 @@
-﻿import { CommunityFeed } from "@/components/community/CommunityFeed";
+import { CommunityFeed } from "@/components/community/CommunityFeed";
 import { CommunityStats } from "@/components/community/CommunityStats";
 import { Leaderboard } from "@/components/community/Leaderboard";
 import { CommunityCrews } from "@/components/community/CommunityCrews";
@@ -6,7 +6,7 @@ import { CommunityMentorships } from "@/components/community/CommunityMentorship
 import { CommunityEvents } from "@/components/community/CommunityEvents";
 import { Separator } from "@/components/ui/separator";
 
-export const metadata = { title: "Community - Battle Arena" };
+export const metadata = { title: "Community - SplitZone" };
 
 export default function CommunityPage() {
   return (
@@ -14,7 +14,7 @@ export default function CommunityPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Community</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Live activity, rankings, and everything happening in the Arena.
+          Live activity, rankings, and everything happening in SplitZone.
         </p>
       </div>
 
@@ -41,4 +41,5 @@ export default function CommunityPage() {
     </div>
   );
 }
+
 
