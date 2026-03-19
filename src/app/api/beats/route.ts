@@ -44,7 +44,28 @@ export async function GET(req: Request) {
     const sortBy = SORTABLE_FIELDS.has(sortByRaw) ? sortByRaw : "usage_count";
     const sortOrder = url.searchParams.get("sort_order") === "asc" ? "asc" : "desc";
 
-    const adminClient = createSupabaseServiceRoleClient();
+    let adminClient;
+    try {
+      adminClient = createSupabaseServiceRoleClient();
+    } catch (error) {
+      console.warn("api/beats: service role unavailable, returning empty beat list", error);
+      return NextResponse.json({
+        ok: true,
+        mode: "supabase",
+        beats: [],
+        total: 0,
+        degraded: true,
+        reason: "supabase_service_role_unavailable",
+        filters: {
+          genre,
+          tempoMin,
+          tempoMax,
+          limit,
+          sortBy,
+          sortOrder,
+        },
+      });
+    }
 
     let query = adminClient
       .from("beats")
