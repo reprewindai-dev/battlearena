@@ -1,7 +1,13 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
+
+const CreateMentorshipSchema = z.object({
+  mentorHandle: z.string().trim().min(1).max(32),
+  note: z.string().trim().max(280).nullable().optional(),
+});
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -84,13 +90,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
-  const mentorHandle = typeof body.mentorHandle === "string" ? body.mentorHandle.trim().toLowerCase() : "";
-  const note = typeof body.note === "string" ? body.note.trim() : null;
+  const body = await req.json().catch(() => ({}));
+  const parsed = CreateMentorshipSchema.safeParse({
+    mentorHandle:
+      typeof (body as { mentorHandle?: unknown }).mentorHandle === "string"
+        ? (body as { mentorHandle: string }).mentorHandle.trim().toLowerCase()
+        : "",
+    note:
+      typeof (body as { note?: unknown }).note === "string"
+        ? (body as { note: string }).note.trim()
+        : null,
+  });
 
-  if (!mentorHandle) {
-    return NextResponse.json({ error: "mentorHandle_required" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
   }
+
+  const mentorHandle = parsed.data.mentorHandle;
+  const note = parsed.data.note ?? null;
 
   const { data: mentor, error: mentorError } = await supabase
     .from("users")
@@ -108,6 +125,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "cannot_request_self" }, { status: 400 });
   }
 
+  const { data: existingMentorship, error: existingMentorshipError } = await supabase
+    .from("mentorships")
+    .select("id,status")
+    .eq("mentor_id", mentor.id)
+    .eq("mentee_id", user.id)
+    .in("status", ["pending", "accepted"])
+    .maybeSingle();
+
+  if (existingMentorshipError) {
+    return NextResponse.json({ error: existingMentorshipError.message }, { status: 400 });
+  }
+  if (existingMentorship) {
+    return NextResponse.json({ error: "mentorship_already_exists" }, { status: 409 });
+  }
+
   const { data, error } = await supabase
     .from("mentorships")
     .insert({
@@ -122,6 +154,15 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  await supabase.from("notifications").insert({
+    user_id: mentor.id,
+    type: "mentorship_request",
+    title: "New mentorship request",
+    body: note ? note.slice(0, 100) : "A player requested mentorship from you.",
+    actor_id: user.id,
+    link: "/app/community",
+  });
 
   return NextResponse.json({ item: data }, { status: 201 });
 }

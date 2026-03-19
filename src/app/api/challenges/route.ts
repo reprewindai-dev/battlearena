@@ -1,10 +1,35 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 type UserRow = { id: string; username: string | null };
 type UserProfileRow = { user_id: string; display_name: string | null; avatar_url: string | null; tier: string | null };
 type UserRatingRow = { user_id: string; rating: number | null; tier: string | null };
+
+const CreateChallengeSchema = z
+  .object({
+    challenged_id: z.string().uuid(),
+    battle_mode: z.enum(["freestyle", "ranked", "wager"]).default("freestyle"),
+    wager_tokens: z.number().int().min(1).max(10000).nullable().optional(),
+    message: z.string().trim().max(280).nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.battle_mode === "wager" && !value.wager_tokens) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["wager_tokens"],
+        message: "wager_tokens_required_for_wager_mode",
+      });
+    }
+    if (value.battle_mode !== "wager" && value.wager_tokens) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["wager_tokens"],
+        message: "wager_tokens_only_supported_for_wager_mode",
+      });
+    }
+  });
 
 // GET - list my challenges (incoming + outgoing)
 export async function GET(req: NextRequest) {
@@ -120,12 +145,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
   }
 
-  const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
-  const { challenged_id, battle_mode = "freestyle", wager_tokens, message } = body;
+  const body = await req.json().catch(() => ({}));
+  const parsed = CreateChallengeSchema.safeParse({
+    challenged_id: (body as { challenged_id?: unknown }).challenged_id,
+    battle_mode: (body as { battle_mode?: unknown }).battle_mode,
+    wager_tokens:
+      typeof (body as { wager_tokens?: unknown }).wager_tokens === "number"
+        ? (body as { wager_tokens: number }).wager_tokens
+        : null,
+    message:
+      typeof (body as { message?: unknown }).message === "string"
+        ? (body as { message: string }).message.trim()
+        : null,
+  });
 
-  if (!challenged_id) {
-    return NextResponse.json({ error: "challenged_id required" }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
   }
+
+  const { challenged_id, battle_mode, wager_tokens, message } = parsed.data;
 
   if (challenged_id === user.id) {
     return NextResponse.json({ error: "Cannot challenge yourself" }, { status: 400 });
@@ -160,7 +198,7 @@ export async function POST(req: NextRequest) {
       challenger_id: user.id,
       challenged_id,
       battle_mode,
-      wager_tokens: typeof wager_tokens === "number" && wager_tokens > 0 ? wager_tokens : null,
+      wager_tokens: wager_tokens ?? null,
       message: message ? String(message).slice(0, 280) : null,
       updated_at: new Date().toISOString(),
     })

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 // GET - check follow status
 export async function GET(
@@ -43,8 +44,26 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
+    await ensurePublicUserRecord(supabase, user);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
+  }
+
   if (user.id === userId) {
     return NextResponse.json({ error: "Cannot follow yourself" }, { status: 400 });
+  }
+
+  const [{ data: targetUser, error: targetError }, { data: actorUser }] = await Promise.all([
+    supabase.from("users").select("id").eq("id", userId).maybeSingle(),
+    supabase.from("users").select("username").eq("id", user.id).maybeSingle(),
+  ]);
+
+  if (targetError) {
+    return NextResponse.json({ error: targetError.message }, { status: 400 });
+  }
+  if (!targetUser) {
+    return NextResponse.json({ error: "user_not_found" }, { status: 404 });
   }
 
   const { error } = await supabase
@@ -63,7 +82,7 @@ export async function POST(
     user_id: userId,
     type: "follow",
     title: "New follower",
-    body: "Someone started following you",
+    body: `${actorUser?.username ?? "Someone"} started following you`,
     actor_id: user.id,
     link: `/app/players/${user.id}`,
   });

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const ALLOWED_STATUSES = new Set(["accepted", "declined", "completed", "cancelled"]);
+const UpdateMentorshipSchema = z.object({
+  status: z.enum(["accepted", "declined", "completed", "cancelled"]),
+});
 
 export async function PATCH(
   req: NextRequest,
@@ -21,8 +25,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await req.json().catch(() => ({} as Record<string, unknown>))) as Record<string, unknown>;
-  const status = typeof body.status === "string" ? body.status : "";
+  const body = await req.json().catch(() => ({}));
+  const parsed = UpdateMentorshipSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
+  }
+  const status = parsed.data.status;
   if (!ALLOWED_STATUSES.has(status)) {
     return NextResponse.json({ error: "invalid_status" }, { status: 400 });
   }
@@ -42,11 +50,21 @@ export async function PATCH(
   if (existing.mentor_id !== user.id && existing.mentee_id !== user.id) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
+  if (existing.status === "completed" || existing.status === "declined" || existing.status === "cancelled") {
+    return NextResponse.json({ error: "mentorship_closed" }, { status: 409 });
+  }
+  if ((status === "accepted" || status === "declined") && existing.mentor_id !== user.id) {
+    return NextResponse.json({ error: "mentor_action_required" }, { status: 403 });
+  }
+  if (status === "completed" && existing.status !== "accepted") {
+    return NextResponse.json({ error: "accepted_mentorship_required" }, { status: 409 });
+  }
 
   const { data, error } = await supabase
     .from("mentorships")
     .update({
       status,
+      started_at: status === "accepted" && existing.status !== "accepted" ? new Date().toISOString() : undefined,
       ended_at: status === "accepted" ? null : new Date().toISOString(),
     })
     .eq("id", id)
