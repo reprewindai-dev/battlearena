@@ -11,7 +11,7 @@ export default function GuestLayout({
     <div className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
         <Link href="/" className="text-sm font-medium tracking-wide">
-          ARENA
+          SPLITZONE
         </Link>
         <div className="flex items-center gap-3">
           <Button asChild variant="ghost">

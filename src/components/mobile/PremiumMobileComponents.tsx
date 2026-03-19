@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BattleArenaLogo, BattleArenaWordmark } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/button';
@@ -33,16 +35,25 @@ interface PremiumMobileLayoutProps {
 }
 
 export const PremiumMobileLayout: React.FC<PremiumMobileLayoutProps> = ({ children }) => {
+  const pathname = usePathname();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
 
-  const navItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'battles', label: 'Battles', icon: Swords },
-    { id: 'beats', label: 'Beats', icon: Mic },
-    { id: 'tournaments', label: 'Tournaments', icon: Trophy },
-    { id: 'profile', label: 'Profile', icon: User },
-  ];
+  const navItems = useMemo(
+    () => [
+      { href: '/', label: 'Home', icon: Home, match: (path: string) => path === '/' },
+      { href: '/app/battles', label: 'Battles', icon: Swords, match: (path: string) => path.startsWith('/app/battles') },
+      { href: '/app/beats', label: 'Beats', icon: Mic, match: (path: string) => path.startsWith('/app/beats') },
+      { href: '/app/tournaments', label: 'Tournaments', icon: Trophy, match: (path: string) => path.startsWith('/app/tournaments') },
+      { href: '/app/profile', label: 'Profile', icon: User, match: (path: string) => path.startsWith('/app/profile') },
+    ],
+    [],
+  );
+
+  const navigateTo = (href: string) => {
+    setMobileMenuOpen(false);
+    router.push(href);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white relative">
@@ -55,7 +66,13 @@ export const PremiumMobileLayout: React.FC<PremiumMobileLayoutProps> = ({ childr
           </div>
           
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="p-2 rounded-lg bg-white/10 hover:bg-white/20">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20"
+              onClick={() => navigateTo('/app/beats')}
+              aria-label="Browse beats"
+            >
               <Search className="w-4 h-4" />
             </Button>
             <Button 
@@ -105,17 +122,14 @@ export const PremiumMobileLayout: React.FC<PremiumMobileLayoutProps> = ({ childr
               <nav className="space-y-2">
                 {navItems.map((item) => (
                   <Button
-                    key={item.id}
+                    key={item.href}
                     variant="ghost"
                     className={`w-full justify-start gap-3 p-3 rounded-lg transition-all ${
-                      activeTab === item.id 
-                        ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white' 
+                      item.match(pathname)
+                        ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white'
                         : 'text-white/70 hover:text-white hover:bg-white/10'
                     }`}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setMobileMenuOpen(false);
-                    }}
+                    onClick={() => navigateTo(item.href)}
                   >
                     <item.icon className="w-5 h-5" />
                     {item.label}
@@ -124,8 +138,11 @@ export const PremiumMobileLayout: React.FC<PremiumMobileLayoutProps> = ({ childr
               </nav>
               
               <div className="mt-8 pt-8 border-t border-white/10">
-                <Button className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-                  Start Battle
+                <Button
+                  className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                  onClick={() => navigateTo('/app/battles')}
+                >
+                  Enter SplitZone
                 </Button>
               </div>
             </motion.div>
@@ -143,17 +160,19 @@ export const PremiumMobileLayout: React.FC<PremiumMobileLayoutProps> = ({ childr
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => (
             <Button
-              key={item.id}
+              key={item.href}
+              asChild
               variant="ghost"
               className={`flex flex-col gap-1 p-2 rounded-lg transition-all ${
-                activeTab === item.id 
-                  ? 'text-orange-400' 
+                item.match(pathname)
+                  ? 'text-orange-400'
                   : 'text-white/50 hover:text-white/80'
               }`}
-              onClick={() => setActiveTab(item.id)}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="text-xs font-medium">{item.label}</span>
+              <Link href={item.href}>
+                <item.icon className="w-5 h-5" />
+                <span className="text-xs font-medium">{item.label}</span>
+              </Link>
             </Button>
           ))}
         </div>
@@ -236,7 +255,7 @@ export const MobileBattleCard: React.FC<MobileBattleCardProps> = ({ battle, onJo
           <div className="flex items-center gap-1">
             <Video className="w-4 h-4 text-red-400" />
             <span className="text-white/60 text-sm">
-              {battle.viewers || Math.floor(Math.random() * 1000) + 100} watching
+              {battle.viewers ?? 0} watching
             </span>
           </div>
           {battle.entry_fee_tokens > 0 && (
