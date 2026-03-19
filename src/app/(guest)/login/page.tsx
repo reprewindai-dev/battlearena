@@ -13,7 +13,7 @@ export default async function LoginPage({
       <div className="md:col-span-6">
         <h1 className="text-3xl font-semibold tracking-tight">Login</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Enter SplitZone and pick up where your last battle left off.
+          Enter Spitzone and pick up where your last battle left off.
         </p>
       </div>
 

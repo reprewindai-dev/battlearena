@@ -48,9 +48,9 @@ export const BattleArenaLogo = ({ size = "medium", className = "" }: { size?: Lo
           <rect x="-4" y="10" width="8" height="4" fill="url(#gradient1)" transform="rotate(90)" />
         </g>
         
-        {/* SplitZone mark */}
+        {/* SPITZONE mark */}
         <text x="50" y="92" textAnchor="middle" fill="url(#gradient1)" fontSize="8" fontWeight="bold" fontFamily="Arial Black">
-          SPLIT
+          SPIT
         </text>
         
         {/* Gradients */}
@@ -81,7 +81,7 @@ export const BattleArenaWordmark = ({ size = "medium", className = "" }: { size?
   return (
     <div className={`${sizeClasses[size]} ${className} font-black tracking-tight`}>
       <span className="bg-gradient-to-r from-orange-500 via-yellow-400 to-orange-600 bg-clip-text text-transparent">
-        SPLIT
+        SPIT
       </span>
       <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-clip-text text-transparent">
         ZONE

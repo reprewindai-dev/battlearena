@@ -8,12 +8,12 @@ const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: "SplitZone - Live Audio Battle Arena",
-  description: "SplitZone is a live audio battle arena for real matchups, real beats, and real competitive rooms.",
+  title: "Spitzone - Live Audio Battle Arena",
+  description: "Spitzone is a live audio battle arena for real matchups, real beats, and real competitive rooms.",
   keywords: ["hip-hop", "rap battles", "beats", "music battles", "trap", "drill", "battle arena"],
-  authors: [{ name: "SplitZone" }],
-  creator: "SplitZone",
-  publisher: "SplitZone",
+  authors: [{ name: "Spitzone" }],
+  creator: "Spitzone",
+  publisher: "Spitzone",
   formatDetection: {
     email: false,
     address: false,
@@ -23,21 +23,21 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: process.env.NEXT_PUBLIC_APP_URL ?? "https://battlearena-poon.onrender.com",
-    title: "SplitZone - Live Audio Battle Arena",
+    title: "Spitzone - Live Audio Battle Arena",
     description: "Live audio battles, real matchmaking, and competitive rooms built for performance.",
-    siteName: "SplitZone",
+    siteName: "Spitzone",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "SplitZone - Live Audio Battle Arena",
+        alt: "Spitzone - Live Audio Battle Arena",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SplitZone - Live Audio Battle Arena",
+    title: "Spitzone - Live Audio Battle Arena",
     description: "Live audio battles, real matchmaking, and competitive rooms built for performance.",
     images: ["/og-image.jpg"],
   },

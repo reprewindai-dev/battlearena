@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-export const metadata = { title: "Battle Lobby - SplitZone" };
+export const metadata = { title: "Battle Lobby - Spitzone" };
 
 async function getRecentBattles() {
   "use server";
@@ -41,7 +41,7 @@ export default function BattleLobbyPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Battle Lobby</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Queue into SplitZone matchmaking or jump straight into a live room.
+            Queue into Spitzone matchmaking or jump straight into a live room.
           </p>
         </div>
         <div className="flex items-center gap-2">

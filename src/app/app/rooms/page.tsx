@@ -1,6 +1,6 @@
 import { RoomLobby } from "@/components/rooms/RoomLobby";
 
-export const metadata = { title: "Rooms & Lobbies - SplitZone" };
+export const metadata = { title: "Rooms & Lobbies - Spitzone" };
 
 export default function RoomsPage() {
   return (
