@@ -52,7 +52,7 @@ export default async function AppLayout({
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Link href="/app" className="flex items-center gap-2 shrink-0">
-            <span className="text-lg font-black tracking-tight">ARENA</span>
+            <span className="text-lg font-black tracking-tight">SPLITZONE</span>
           </Link>
 
           <div className="hidden md:block flex-1 max-w-xs">

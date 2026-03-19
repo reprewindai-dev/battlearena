@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { BattleArenaLogo, BattleArenaWordmark } from '@/components/brand/Logo';
 
@@ -79,11 +80,11 @@ export const HeroBanner = ({ className = "" }) => {
           transition={{ duration: 0.8, delay: 0.4 }}
           className="max-w-2xl mx-auto"
         >
-          <p className="text-white/80 text-lg mb-8 font-medium">
-            Where <span className="text-orange-400 font-bold">BEATS</span> meet{' '}
-            <span className="text-purple-400 font-bold">BATTLES</span>.{' '}
-            <span className="text-pink-400 font-bold">CROWN</span> your{' '}
-            <span className="text-yellow-400 font-bold">DOMINANCE</span>.
+          <p className="text-white/80 text-lg mb-3 font-medium">
+            Head-to-head audio battles. Real rooms. Real rounds. Real outcomes.
+          </p>
+          <p className="text-white/55 text-sm uppercase tracking-[0.3em]">
+            Queue up. Lock in. Split the room.
           </p>
         </motion.div>
 
@@ -93,41 +94,28 @@ export const HeroBanner = ({ className = "" }) => {
           transition={{ duration: 0.8, delay: 0.6 }}
           className="flex gap-4"
         >
-          <motion.button
+          <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-8 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition-all"
           >
-            ENTER THE ARENA
-          </motion.button>
-          <motion.button
+            <Link
+              href="/app/battles"
+              className="px-8 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition-all inline-flex"
+            >
+              ENTER SPLITZONE
+            </Link>
+          </motion.div>
+          <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="px-8 py-3 bg-white/10 backdrop-blur-sm text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all"
           >
-            WATCH BATTLES
-          </motion.button>
-        </motion.div>
-
-        {/* Stats */}
-        <motion.div
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
-          className="flex gap-8 mt-12"
-        >
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-400">50K+</div>
-            <div className="text-white/60 text-sm">BATTLES</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-purple-400">100K+</div>
-            <div className="text-white/60 text-sm">BEATS</div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-pink-400">$1M+</div>
-            <div className="text-white/60 text-sm">PRIZES</div>
-          </div>
+            <Link
+              href="/app/battles/room"
+              className="px-8 py-3 bg-white/10 backdrop-blur-sm text-white font-bold rounded-full border border-white/20 hover:bg-white/20 transition-all inline-flex"
+            >
+              WATCH LIVE
+            </Link>
+          </motion.div>
         </motion.div>
       </div>
 
@@ -143,7 +131,7 @@ export const BattleBanner = ({ battle, className = "" }: { battle: Battle; class
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-orange-900/40 to-pink-900/40" />
       
-      {/* Battle image placeholder */}
+      {/* Background image for battle banner */}
       <div
         className="absolute inset-0 bg-cover bg-center opacity-50"
         style={{ backgroundImage: "url('https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&h=400&fit=crop')" }}

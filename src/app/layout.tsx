@@ -8,12 +8,12 @@ const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: "BattleArena - Where Beats Meet Battles",
-  description: "The ultimate hip-hop battle platform. Compete in rap battles, showcase your beats, and win prizes.",
+  title: "SplitZone - Live Audio Battle Arena",
+  description: "SplitZone is a live audio battle arena for real matchups, real beats, and real competitive rooms.",
   keywords: ["hip-hop", "rap battles", "beats", "music battles", "trap", "drill", "battle arena"],
-  authors: [{ name: "BattleArena" }],
-  creator: "BattleArena",
-  publisher: "BattleArena",
+  authors: [{ name: "SplitZone" }],
+  creator: "SplitZone",
+  publisher: "SplitZone",
   formatDetection: {
     email: false,
     address: false,
@@ -22,23 +22,23 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://battlearena.com",
-    title: "BattleArena - Where Beats Meet Battles",
-    description: "The ultimate hip-hop battle platform. Compete in rap battles, showcase your beats, and win prizes.",
-    siteName: "BattleArena",
+    url: process.env.NEXT_PUBLIC_APP_URL ?? "https://battlearena-poon.onrender.com",
+    title: "SplitZone - Live Audio Battle Arena",
+    description: "Live audio battles, real matchmaking, and competitive rooms built for performance.",
+    siteName: "SplitZone",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "BattleArena - Hip-Hop Battle Platform",
+        alt: "SplitZone - Live Audio Battle Arena",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BattleArena - Where Beats Meet Battles",
-    description: "The ultimate hip-hop battle platform. Compete in rap battles, showcase your beats, and win prizes.",
+    title: "SplitZone - Live Audio Battle Arena",
+    description: "Live audio battles, real matchmaking, and competitive rooms built for performance.",
     images: ["/og-image.jpg"],
   },
 };
