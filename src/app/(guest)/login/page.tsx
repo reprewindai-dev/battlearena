@@ -13,7 +13,7 @@ export default async function LoginPage({
       <div className="md:col-span-6">
         <h1 className="text-3xl font-semibold tracking-tight">Login</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Supabase authentication is required. Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+          Enter SplitZone and pick up where your last battle left off.
         </p>
       </div>
 

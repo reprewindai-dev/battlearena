@@ -48,7 +48,7 @@ export default function SignupPage() {
       router.refresh();
     } catch {
       setError(
-        "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+        "Signup is temporarily unavailable. Try again in a moment.",
       );
     }
   }

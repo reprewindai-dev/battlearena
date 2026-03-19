@@ -34,7 +34,18 @@ export async function GET(request: Request) {
     const limitRaw = Number(url.searchParams.get("limit") ?? "12");
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, Math.floor(limitRaw))) : 12;
 
-    const adminClient = createSupabaseServiceRoleClient();
+    let adminClient;
+    try {
+      adminClient = createSupabaseServiceRoleClient();
+    } catch (error) {
+      console.warn("api/battles: service role unavailable, returning empty live list", error);
+      return NextResponse.json({
+        ok: true,
+        battles: [],
+        degraded: true,
+        reason: "supabase_service_role_unavailable",
+      });
+    }
 
     const { data: battles, error: battlesError } = await adminClient
       .from("battles")
