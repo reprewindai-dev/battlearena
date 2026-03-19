@@ -3,7 +3,7 @@ import { BattleHistory } from "@/components/community/BattleHistory";
 import { Separator } from "@/components/ui/separator";
 import { getSessionUser } from "@/lib/auth/session";
 
-export const metadata = { title: "Player – Battle Arena" };
+export const metadata = { title: "Player - SplitZone" };
 
 export default async function PlayerProfilePage({
   params,
@@ -24,3 +24,6 @@ export default async function PlayerProfilePage({
     </div>
   );
 }
+
+
+

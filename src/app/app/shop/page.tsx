@@ -1,7 +1,10 @@
 import { TokenShop } from "@/components/payment/TokenShop";
 
-export const metadata = { title: "Shop – Battle Arena" };
+export const metadata = { title: "Shop - SplitZone" };
 
 export default function ShopPage() {
   return <TokenShop />;
 }
+
+
+

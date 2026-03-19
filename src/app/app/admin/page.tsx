@@ -4,7 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { getSessionRole } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 
-export const metadata = { title: "Admin Panel – Battle Arena" };
+export const metadata = { title: "Admin Panel - SplitZone" };
 
 export default async function AdminPanelPage() {
   const role = await getSessionRole();
@@ -30,3 +30,6 @@ export default async function AdminPanelPage() {
     </div>
   );
 }
+
+
+
