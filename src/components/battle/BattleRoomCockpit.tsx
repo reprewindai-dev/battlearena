@@ -1177,9 +1177,9 @@ export function BattleRoomCockpit() {
         <div className="text-right text-xs text-muted-foreground">
           {isSupabaseMode ? (
             <>
-              <div>Online: {onlineCount ?? "â€¦"}</div>
+              <div>Online: {onlineCount ?? "..."}</div>
               <div>
-                Typing: {typingUserIds.length > 0 ? `${typingUserIds.length}` : "â€”"}
+                Typing: {typingUserIds.length > 0 ? `${typingUserIds.length}` : "--"}
               </div>
             </>
           ) : (
@@ -1239,7 +1239,7 @@ export function BattleRoomCockpit() {
                       onClick={() => updateBattleStatus("live")}
                       disabled={isUpdatingStatus}
                     >
-                      {isUpdatingStatus ? "Updatingâ€¦" : "Start"}
+                      {isUpdatingStatus ? "Updating..." : "Start"}
                     </Button>
                   ) : (
                     <Button
@@ -1248,7 +1248,7 @@ export function BattleRoomCockpit() {
                       onClick={() => void finalizeBattle()}
                       disabled={isFinalizing || votingClosed}
                     >
-                      {isFinalizing ? "Finalizingâ€¦" : "Finalize"}
+                      {isFinalizing ? "Finalizing..." : "Finalize"}
                     </Button>
                   )}
                 </>
@@ -1257,7 +1257,7 @@ export function BattleRoomCockpit() {
 
             {showJoinAsB ? (
               <Button size="sm" variant="secondary" onClick={joinAsB} disabled={isJoining}>
-                {isJoining ? "Joiningâ€¦" : "Join as B"}
+                {isJoining ? "Joining..." : "Join as B"}
               </Button>
             ) : null}
 
@@ -1279,7 +1279,7 @@ export function BattleRoomCockpit() {
         <VideoBattleProduction
           battleId={sessionId}
           viewerUserId={sessionMeta?.viewer_user_id ?? viewerUserIdFallback ?? ""}
-          localSlot={slotA?.user_id === sessionMeta?.viewer_user_id ? 1 : 2}
+          localSlot={localSlot}
           onStreamReady={async (stream) => {
             // Check video session limit before tracking
             const canUseVideo = await checkUsageLimit("video_session");
@@ -1374,13 +1374,13 @@ export function BattleRoomCockpit() {
               <div>
                 <div className="text-sm font-medium">Recording</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Status: <span className="text-foreground">{recordingState}</span> Â· Duration:{" "}
+                  Status: <span className="text-foreground">{recordingState}</span> · Duration:{" "}
                   <span className="font-mono text-foreground">
                     {formatMMSS(recordingSeconds)}
                   </span>
                   {isSupabaseMode ? (
                     <>
-                      {" "}Â· Persisted{" "}
+                      {" "}· Persisted{" "}
                       <span className="font-mono text-foreground">
                         {recordingsCount ?? "--"}
                       </span>
@@ -1411,7 +1411,7 @@ export function BattleRoomCockpit() {
                     onClick={enableMic}
                     disabled={micStatus === "requesting" || micStatus === "unsupported"}
                   >
-                    {micStatus === "requesting" ? "Requestingâ€¦" : "Enable Mic"}
+                    {micStatus === "requesting" ? "Requesting..." : "Enable Mic"}
                   </Button>
                 ) : isClient && micStatus === "granted" ? (
                   <Badge className="bg-cyan-500/15 text-cyan-200">Mic ready</Badge>
@@ -1448,7 +1448,7 @@ export function BattleRoomCockpit() {
                     onClick={() => void playLatestPersisted()}
                     disabled={!latestRecordingId || isPlayingPersisted}
                   >
-                    {isPlayingPersisted ? "Loadingâ€¦" : "Play Persisted"}
+                    {isPlayingPersisted ? "Loading..." : "Play Persisted"}
                   </Button>
                 ) : null}
                 <Button
@@ -1463,7 +1463,7 @@ export function BattleRoomCockpit() {
                   {isClient && (
                     <>
                       {isSupabaseMode && isUploadingRecording
-                        ? "Uploadingâ€¦"
+                        ? "Uploading..."
                         : micStatus === "unsupported"
                           ? "Unsupported"
                           : "MediaRecorder"}
@@ -1545,7 +1545,7 @@ export function BattleRoomCockpit() {
                               onClick={() => void deletePersistedRecording(r.id)}
                               disabled={deletingRecordingId === r.id || isPlayingPersisted}
                             >
-                              {deletingRecordingId === r.id ? "Deletingâ€¦" : "Delete"}
+                              {deletingRecordingId === r.id ? "Deleting..." : "Delete"}
                             </Button>
                           ) : null}
                         </div>
@@ -1597,7 +1597,7 @@ export function BattleRoomCockpit() {
                 <Textarea
                   value={chatDraft}
                   onChange={(e) => setChatDraft(e.target.value)}
-                  placeholder="Say somethingâ€¦"
+                  placeholder="Say something..."
                   className="min-h-[44px]"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -1632,7 +1632,7 @@ export function BattleRoomCockpit() {
                         <div className="mt-1 text-xs text-muted-foreground">
                           Voting {votingClosed ? "closed" : "open"}
                           {remainingSeconds !== null && !votingClosed
-                            ? ` Â· closes in ${remainingSeconds}s`
+                            ? ` · closes in ${remainingSeconds}s`
                             : ""}
                         </div>
                       ) : null}
