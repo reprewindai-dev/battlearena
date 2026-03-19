@@ -311,7 +311,7 @@ const PremiumMobileHomePage: React.FC = () => {
             <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
               <Link href="/app/battles">
                 <Swords className="w-5 h-5" />
-                Start Battle
+                Enter Battle
               </Link>
             </Button>
             <Button asChild className="bg-white/10 backdrop-blur-sm border border-white/20 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
@@ -369,27 +369,6 @@ const PremiumMobileHomePage: React.FC = () => {
           </Card>
         </section>
 
-        {/* CTA Section */}
-        <section className="px-4 pb-8">
-          <Card className="bg-gradient-to-br from-orange-900/40 via-purple-900/40 to-pink-900/40 border-white/10 backdrop-blur-sm rounded-2xl p-6">
-            <CardContent className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-3">
-                Ready to <span className="bg-gradient-to-r from-orange-400 to-pink-400 bg-clip-text text-transparent">DOMINATE</span>?
-              </h2>
-              <p className="text-white/80 mb-6">
-                Join thousands of battlers in the ultimate hip-hop arena
-              </p>
-              <div className="flex flex-col gap-3">
-                <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white font-bold py-3 rounded-full">
-                  <Link href="/app/battles">Start Your First Battle</Link>
-                </Button>
-                <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10 py-3 rounded-full">
-                  <Link href="/app/battles/room">Watch Live Battles</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </section>
       </div>
     </PremiumMobileLayout>
   );

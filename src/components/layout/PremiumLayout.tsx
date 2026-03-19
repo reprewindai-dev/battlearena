@@ -63,7 +63,7 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-lg border-b border-white/10">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur-lg lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <BattleArenaLogo size="small" />
@@ -71,15 +71,15 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <button
             onClick={() => setMobileMenuOpen((open) => !open)}
-            className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            className="rounded-lg bg-white/10 p-2 transition-colors hover:bg-white/20"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </header>
 
-      <header className="hidden lg:block fixed top-0 left-0 right-0 z-50 bg-black/90 backdrop-blur-lg border-b border-white/10">
+      <header className="fixed left-0 right-0 top-0 z-50 hidden border-b border-white/10 bg-black/90 backdrop-blur-lg lg:block">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -87,11 +87,11 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
               <BattleArenaWordmark size="medium" />
             </div>
 
-            <nav className="hidden lg:flex items-center gap-6">
+            <nav className="hidden items-center gap-6 lg:flex">
               {appNavigation.map(({ href, label, icon: Icon }) => (
-                <Button key={href} asChild variant="ghost" className="text-white hover:bg-white/10 flex items-center gap-2">
+                <Button key={href} asChild variant="ghost" className="flex items-center gap-2 text-white hover:bg-white/10">
                   <Link href={href}>
-                    <Icon className="w-4 h-4" />
+                    <Icon className="h-4 w-4" />
                     {label}
                   </Link>
                 </Button>
@@ -100,11 +100,11 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
 
             <div className="flex items-center gap-4">
               <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-                <Link href="/app/battles">Start Battle</Link>
+                <Link href="/app/battles">Enter Battle</Link>
               </Button>
-              <Button asChild variant="ghost" className="rounded-full p-0 h-auto">
+              <Button asChild variant="ghost" className="h-auto rounded-full p-0">
                 <Link href="/app/profile" aria-label="Open profile">
-                  <div className="w-10 h-10 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full" />
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-400 to-pink-400" />
                 </Link>
               </Button>
             </div>
@@ -113,31 +113,30 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
       </header>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-black/95 backdrop-blur-lg">
-          <div className="flex flex-col h-full pt-20 px-6 pb-6">
+        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-lg lg:hidden">
+          <div className="flex h-full flex-col px-6 pb-6 pt-20">
             <nav className="flex flex-col gap-4">
-              {[
-                ...appNavigation,
-                { href: "/app/profile", label: "Profile", icon: User },
-              ].map(({ href, label, icon: Icon }) => (
-                <Button
-                  key={href}
-                  asChild
-                  variant="ghost"
-                  className="text-white hover:bg-white/10 justify-start"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <Link href={href}>
-                    <Icon className="w-4 h-4 mr-3" />
-                    {label}
-                  </Link>
-                </Button>
-              ))}
+              {[...appNavigation, { href: "/app/profile", label: "Profile", icon: User }].map(
+                ({ href, label, icon: Icon }) => (
+                  <Button
+                    key={href}
+                    asChild
+                    variant="ghost"
+                    className="justify-start text-white hover:bg-white/10"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Link href={href}>
+                      <Icon className="mr-3 h-4 w-4" />
+                      {label}
+                    </Link>
+                  </Button>
+                ),
+              )}
             </nav>
 
             <div className="mt-auto">
               <Button asChild className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-                <Link href="/app/battles">Start Battle</Link>
+                <Link href="/app/battles">Enter Battle</Link>
               </Button>
             </div>
           </div>
@@ -146,13 +145,13 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
 
       <main className="lg:pt-20">{children}</main>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-lg border-t border-white/10 z-40">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black/90 backdrop-blur-lg lg:hidden">
         <div className="flex items-center justify-around py-2">
           {[...appNavigation, { href: "/app/profile", label: "Profile", icon: User }].map(
             ({ href, label, icon: Icon }) => (
-              <Button key={href} asChild variant="ghost" className="text-white hover:bg-white/10 flex flex-col gap-1 p-2">
+              <Button key={href} asChild variant="ghost" className="flex flex-col gap-1 p-2 text-white hover:bg-white/10">
                 <Link href={href}>
-                  <Icon className="w-5 h-5" />
+                  <Icon className="h-5 w-5" />
                   <span className="text-xs">{label}</span>
                 </Link>
               </Button>
@@ -243,25 +242,25 @@ export const PremiumHomePage: React.FC = () => {
 
   const statCards = [
     {
-      icon: <Zap className="w-6 h-6 text-orange-400" />,
+      icon: <Zap className="h-6 w-6 text-orange-400" />,
       value: stats.activeBattles,
       label: "Active Battles",
       classes: "from-orange-900/20 to-orange-800/20 border-orange-500/20 text-orange-400",
     },
     {
-      icon: <Mic className="w-6 h-6 text-purple-400" />,
+      icon: <Mic className="h-6 w-6 text-purple-400" />,
       value: stats.beatsInLibrary,
       label: "Beats",
       classes: "from-purple-900/20 to-purple-800/20 border-purple-500/20 text-purple-400",
     },
     {
-      icon: <Users className="w-6 h-6 text-pink-400" />,
+      icon: <Users className="h-6 w-6 text-pink-400" />,
       value: stats.activeBattlers,
       label: "Battlers",
       classes: "from-pink-900/20 to-pink-800/20 border-pink-500/20 text-pink-400",
     },
     {
-      icon: <Trophy className="w-6 h-6 text-yellow-400" />,
+      icon: <Trophy className="h-6 w-6 text-yellow-400" />,
       value: stats.topRating,
       label: "Top ELO",
       classes: "from-yellow-900/20 to-yellow-800/20 border-yellow-500/20 text-yellow-400",
@@ -274,23 +273,23 @@ export const PremiumHomePage: React.FC = () => {
         <HeroBanner />
       </section>
 
-      <section className="container mx-auto px-4 lg:px-6 py-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <section className="container mx-auto px-4 py-8 lg:px-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {statCards.map((stat) => (
             <Card key={stat.label} className={`bg-gradient-to-br ${stat.classes}`}>
-              <CardContent className="p-4 lg:p-6 text-center">
-                <div className="flex items-center justify-center mb-2">{stat.icon}</div>
-                <div className={`text-2xl lg:text-3xl font-bold ${stat.classes.split(" ").at(-1)}`}>{stat.value}</div>
-                <div className="text-white/60 text-sm">{stat.label}</div>
+              <CardContent className="p-4 text-center lg:p-6">
+                <div className="mb-2 flex items-center justify-center">{stat.icon}</div>
+                <div className={`text-2xl font-bold lg:text-3xl ${stat.classes.split(" ").at(-1)}`}>{stat.value}</div>
+                <div className="text-sm text-white/60">{stat.label}</div>
               </CardContent>
             </Card>
           ))}
         </div>
       </section>
 
-      <section className="container mx-auto px-4 lg:px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl lg:text-3xl font-bold text-white">
+      <section className="container mx-auto px-4 py-8 lg:px-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white lg:text-3xl">
             Featured <span className="bg-gradient-to-r from-orange-400 to-pink-400 bg-clip-text text-transparent">Battles</span>
           </h2>
           <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
@@ -298,45 +297,46 @@ export const PremiumHomePage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
           {featuredBattles.length === 0 ? (
-            <Card className="col-span-full bg-gradient-to-br from-purple-900/20 to-orange-900/20 border-white/10">
-              <CardContent className="p-6 text-white/70">
-                No live or queued battles are available right now.
-              </CardContent>
+            <Card className="col-span-full border-white/10 bg-gradient-to-br from-purple-900/20 to-orange-900/20">
+              <CardContent className="p-6 text-white/70">No live or queued battles are available right now.</CardContent>
             </Card>
           ) : (
             featuredBattles.map((battle) => (
-              <Card key={battle.id} className="bg-gradient-to-br from-purple-900/20 to-orange-900/20 border-white/10 hover:border-white/20 transition-all">
+              <Card
+                key={battle.id}
+                className="border-white/10 bg-gradient-to-br from-purple-900/20 to-orange-900/20 transition-all hover:border-white/20"
+              >
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="mb-4 flex items-center justify-between">
                     <Badge className={battle.status === "active" ? "bg-orange-500 text-white" : "bg-slate-700 text-white"}>
                       {battle.status.toUpperCase()}
                     </Badge>
                     <div className="flex items-center gap-2">
-                      <Video className="w-4 h-4 text-red-400" />
-                      <span className="text-red-400 text-sm font-bold">{battle.battle_type.toUpperCase()}</span>
+                      <Video className="h-4 w-4 text-red-400" />
+                      <span className="text-sm font-bold text-red-400">{battle.battle_type.toUpperCase()}</span>
                     </div>
                   </div>
 
-                  <h3 className="text-xl font-bold text-white mb-2">{battle.title}</h3>
+                  <h3 className="mb-2 text-xl font-bold text-white">{battle.title}</h3>
 
-                  <div className="flex items-center justify-between mb-4 text-sm text-white/70">
+                  <div className="mb-4 flex items-center justify-between text-sm text-white/70">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
+                      <Clock className="h-4 w-4" />
                       <span>{battle.format}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
+                      <Users className="h-4 w-4" />
                       <span>{battle.viewers} watching</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-white/60 text-sm">Entry</span>
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-sm text-white/60">Entry</span>
                     <div className="flex items-center gap-1">
-                      <span className="text-yellow-400 text-sm font-bold">{battle.entry_fee_tokens}</span>
-                      <span className="text-white/60 text-sm">tokens</span>
+                      <span className="text-sm font-bold text-yellow-400">{battle.entry_fee_tokens}</span>
+                      <span className="text-sm text-white/60">tokens</span>
                     </div>
                   </div>
 
@@ -353,9 +353,9 @@ export const PremiumHomePage: React.FC = () => {
         </div>
       </section>
 
-      <section className="container mx-auto px-4 lg:px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl lg:text-3xl font-bold text-white">
+      <section className="container mx-auto px-4 py-8 lg:px-6">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white lg:text-3xl">
             Trending <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Beats</span>
           </h2>
           <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
@@ -363,9 +363,9 @@ export const PremiumHomePage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {trendingBeats.length === 0 ? (
-            <Card className="col-span-full bg-gradient-to-br from-purple-900/20 to-pink-900/20 border-white/10">
+            <Card className="col-span-full border-white/10 bg-gradient-to-br from-purple-900/20 to-pink-900/20">
               <CardContent className="p-6 text-white/70">No beats are available right now.</CardContent>
             </Card>
           ) : (
@@ -376,18 +376,18 @@ export const PremiumHomePage: React.FC = () => {
                 className="h-auto p-0 hover:bg-transparent"
                 onClick={() => router.push("/app/beats")}
               >
-                <Card className="w-full bg-gradient-to-br from-purple-900/20 to-pink-900/20 border-white/10 hover:border-white/20 transition-all cursor-pointer text-left">
+                <Card className="w-full cursor-pointer border-white/10 bg-gradient-to-br from-purple-900/20 to-pink-900/20 text-left transition-all hover:border-white/20">
                   <CardContent className="p-4">
-                    <div className="w-full h-24 bg-gradient-to-br from-orange-400 to-pink-400 rounded-lg mb-3 flex items-center justify-center">
-                      <Mic className="w-8 h-8 text-white/80" />
+                    <div className="mb-3 flex h-24 w-full items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-pink-400">
+                      <Mic className="h-8 w-8 text-white/80" />
                     </div>
-                    <h4 className="text-white font-bold text-sm mb-1">{beat.title}</h4>
-                    <p className="text-white/60 text-xs mb-2">{beat.artist}</p>
+                    <h4 className="mb-1 text-sm font-bold text-white">{beat.title}</h4>
+                    <p className="mb-2 text-xs text-white/60">{beat.artist}</p>
                     <div className="flex items-center justify-between">
-                      <span className="text-orange-400 text-xs font-bold">{beat.tempo} BPM</span>
+                      <span className="text-xs font-bold text-orange-400">{beat.tempo} BPM</span>
                       <div className="flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3 text-green-400" />
-                        <span className="text-green-400 text-xs">{beat.usage_count} uses</span>
+                        <TrendingUp className="h-3 w-3 text-green-400" />
+                        <span className="text-xs text-green-400">{beat.usage_count} uses</span>
                       </div>
                     </div>
                   </CardContent>
@@ -395,27 +395,6 @@ export const PremiumHomePage: React.FC = () => {
               </Button>
             ))
           )}
-        </div>
-      </section>
-
-      <section className="container mx-auto px-4 lg:px-6 py-16">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-900/40 via-purple-900/40 to-pink-900/40 p-8 lg:p-12">
-          <div className="relative z-10 text-center">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
-              Ready to <span className="bg-gradient-to-r from-orange-400 to-pink-400 bg-clip-text text-transparent">DOMINATE</span> the Arena?
-            </h2>
-            <p className="text-white/80 text-lg mb-8 max-w-2xl mx-auto">
-              Join the live battle network, queue for real matchups, and enter the arena with real beats.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 px-8 py-3 text-lg">
-                <Link href="/app/battles">Start Your First Battle</Link>
-              </Button>
-              <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10 px-8 py-3 text-lg">
-                <Link href="/app/battles/room">Watch Live Battles</Link>
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
     </PremiumLayout>
