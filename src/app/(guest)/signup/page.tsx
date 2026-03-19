@@ -23,10 +23,12 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function handleSignup() {
     setError(null);
+    setSuccess(null);
 
     const parsed = schema.safeParse({ email, password });
     if (!parsed.success) {
@@ -36,7 +38,7 @@ export default function SignupPage() {
 
     try {
       const supabase = createSupabaseBrowserClient();
-      const { error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: parsed.data.email,
         password: parsed.data.password,
       });
@@ -44,8 +46,14 @@ export default function SignupPage() {
         setError(signUpError.message);
         return;
       }
-      router.push("/app");
-      router.refresh();
+
+      if (data.session) {
+        router.push("/app");
+        router.refresh();
+        return;
+      }
+
+      setSuccess("Account created. Check your email to confirm your Spitzone account before signing in.");
     } catch {
       setError(
         "Signup is temporarily unavailable. Try again in a moment.",
@@ -96,6 +104,9 @@ export default function SignupPage() {
 
             {error ? (
               <div className="text-sm text-destructive">{error}</div>
+            ) : null}
+            {success ? (
+              <div className="text-sm text-emerald-400">{success}</div>
             ) : null}
 
             <Button type="submit" className="w-full" disabled={pending}>
