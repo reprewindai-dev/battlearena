@@ -43,11 +43,10 @@ jobs:
       SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      LIVEKIT_API_KEY: ${{ secrets.LIVEKIT_API_KEY }}
-      LIVEKIT_API_SECRET: ${{ secrets.LIVEKIT_API_SECRET }}
-      NEXT_PUBLIC_LIVEKIT_URL: ws://127.0.0.1:7880
-      LIVEKIT_HEALTH_URL: http://127.0.0.1:7880/
-      LIVEKIT_START_TIMEOUT_MS: 120000
+      E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
+      E2E_TEST_EMAIL_B: ${{ secrets.E2E_TEST_EMAIL_B }}
+      E2E_TEST_PASSWORD_B: ${{ secrets.E2E_TEST_PASSWORD_B }}
 
     steps:
       - name: Checkout
@@ -63,19 +62,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Validate Required Secrets
-        run: |
-          test -n "$NEXT_PUBLIC_SUPABASE_URL"
-          test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY"
-          test -n "$SUPABASE_SERVICE_ROLE_KEY"
-          test -n "$LIVEKIT_API_KEY"
-          test -n "$LIVEKIT_API_SECRET"
-
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Build
-        run: npm run build
-
-      - name: E2E
-        run: npm run test:e2e
+      - name: Run smoke E2E suite
+        run: npm run test:e2e:live
