@@ -1,25 +1,107 @@
-﻿import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { createClient } from "@supabase/supabase-js";
+import { config } from "dotenv";
 
-/**
- * Production E2E Tests
- * 
- * These tests verify the application works in production mode with real Supabase auth.
- * Tests that require authentication are skipped if test credentials are not configured.
- * 
- * To run authenticated tests, set these environment variables:
- * - E2E_TEST_EMAIL: Test user email
- * - E2E_TEST_PASSWORD: Test user password
- * - E2E_TEST_EMAIL_B: Second test user email (for matchmaking tests)
- * - E2E_TEST_PASSWORD_B: Second test user password
- */
+config({ path: ".env.local" });
+config();
+
+type Credentials = {
+  id: string;
+  email: string;
+  password: string;
+};
 
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL;
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 const TEST_EMAIL_B = process.env.E2E_TEST_EMAIL_B;
 const TEST_PASSWORD_B = process.env.E2E_TEST_PASSWORD_B;
 
-const hasTestCredentials = Boolean(TEST_EMAIL && TEST_PASSWORD);
-const hasMatchmakingCredentials = Boolean(TEST_EMAIL && TEST_PASSWORD && TEST_EMAIL_B && TEST_PASSWORD_B);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const hasAdminEnv = Boolean(supabaseUrl && serviceRoleKey);
+const hasExplicitTestCredentials = Boolean(TEST_EMAIL && TEST_PASSWORD);
+const hasExplicitMatchmakingCredentials = Boolean(TEST_EMAIL && TEST_PASSWORD && TEST_EMAIL_B && TEST_PASSWORD_B);
+
+const adminClient = hasAdminEnv
+  ? createClient(supabaseUrl as string, serviceRoleKey as string)
+  : null;
+
+const createdUserIds: string[] = [];
+
+function requireAdminClient() {
+  if (!adminClient) {
+    throw new Error("smoke_test_admin_env_missing");
+  }
+  return adminClient;
+}
+
+function randomSuffix() {
+  return `${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
+}
+
+async function createVerifiedUser(prefix: string): Promise<Credentials> {
+  const client = requireAdminClient();
+  const email = `${prefix}_${randomSuffix()}@battlearena-e2e.local`;
+  const password = `E2E_${randomSuffix()}_Strong!`;
+
+  const { data, error } = await client.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+
+  if (error || !data.user) {
+    throw new Error(`failed_to_create_smoke_user:${error?.message ?? "unknown"}`);
+  }
+
+  createdUserIds.push(data.user.id);
+  return { id: data.user.id, email, password };
+}
+
+const provisionedCredentialsPromise: Promise<{ userA: Credentials; userB: Credentials } | null> =
+  hasAdminEnv && !hasExplicitMatchmakingCredentials
+    ? Promise.all([
+        createVerifiedUser("smoke_a"),
+        createVerifiedUser("smoke_b"),
+      ]).then(([userA, userB]) => ({ userA, userB }))
+    : Promise.resolve(null);
+
+async function getAuthenticatedUsers() {
+  if (hasExplicitMatchmakingCredentials) {
+    return {
+      userA: { id: "explicit-a", email: TEST_EMAIL!, password: TEST_PASSWORD! },
+      userB: { id: "explicit-b", email: TEST_EMAIL_B!, password: TEST_PASSWORD_B! },
+    } satisfies { userA: Credentials; userB: Credentials };
+  }
+
+  const provisioned = await provisionedCredentialsPromise;
+  if (!provisioned) {
+    throw new Error("smoke_test_credentials_missing");
+  }
+
+  return provisioned;
+}
+
+async function login(page: Page, credentials: Credentials) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(credentials.email);
+  await page.getByLabel("Password").fill(credentials.password);
+  await page.getByRole("button", { name: "Login" }).click();
+  await expect(page).toHaveURL(/\/app/, { timeout: 10000 });
+}
+
+test.afterAll(async () => {
+  if (!adminClient || createdUserIds.length === 0) return;
+
+  await adminClient.from("matchmaking_queue").delete().in("user_id", createdUserIds);
+  await adminClient.from("battle_participants").delete().in("user_id", createdUserIds);
+  await adminClient.from("battles").delete().in("created_by", createdUserIds);
+  await adminClient.from("users").delete().in("id", createdUserIds);
+
+  for (const userId of createdUserIds) {
+    await adminClient.auth.admin.deleteUser(userId);
+  }
+});
 
 test("auth flow renders", async ({ page }) => {
   await page.goto("/login");
@@ -49,19 +131,11 @@ test("home page renders", async ({ page }) => {
 });
 
 test.describe("authenticated tests", () => {
-  test.skip(!hasTestCredentials, "Skipping: E2E_TEST_EMAIL and E2E_TEST_PASSWORD not set");
+  test.skip(!hasExplicitTestCredentials && !hasAdminEnv, "Skipping: real auth credentials or Supabase admin env not set");
 
   test.beforeEach(async ({ page }) => {
-    if (!hasTestCredentials) return;
-    
-    // Login before each test
-    await page.goto("/login");
-    await page.getByLabel("Email").fill(TEST_EMAIL!);
-    await page.getByLabel("Password").fill(TEST_PASSWORD!);
-    await page.getByRole("button", { name: "Login" }).click();
-    
-    // Wait for redirect to app
-    await expect(page).toHaveURL(/\/app/, { timeout: 10000 });
+    const { userA } = await getAuthenticatedUsers();
+    await login(page, userA);
   });
 
   test("battle room loads", async ({ page }) => {
@@ -87,10 +161,10 @@ test.describe("authenticated tests", () => {
 });
 
 test.describe("matchmaking tests", () => {
-  test.skip(!hasMatchmakingCredentials, "Skipping: Matchmaking test credentials not set");
+  test.skip(!hasExplicitMatchmakingCredentials && !hasAdminEnv, "Skipping: matchmaking credentials or Supabase admin env not set");
 
   test("ranked queue matches two users into the same battle", async ({ browser }) => {
-    if (!hasMatchmakingCredentials) return;
+    const { userA, userB } = await getAuthenticatedUsers();
 
     const contextA = await browser.newContext();
     const contextB = await browser.newContext();
@@ -98,35 +172,21 @@ test.describe("matchmaking tests", () => {
     const pageA = await contextA.newPage();
     const pageB = await contextB.newPage();
 
-    // Login user A
-    await pageA.goto("/login");
-    await pageA.getByLabel("Email").fill(TEST_EMAIL!);
-    await pageA.getByLabel("Password").fill(TEST_PASSWORD!);
-    await pageA.getByRole("button", { name: "Login" }).click();
-    await expect(pageA).toHaveURL(/\/app/, { timeout: 10000 });
+    await login(pageA, userA);
+    await login(pageB, userB);
 
-    // Login user B
-    await pageB.goto("/login");
-    await pageB.getByLabel("Email").fill(TEST_EMAIL_B!);
-    await pageB.getByLabel("Password").fill(TEST_PASSWORD_B!);
-    await pageB.getByRole("button", { name: "Login" }).click();
-    await expect(pageB).toHaveURL(/\/app/, { timeout: 10000 });
-
-    // Navigate to battles
     await pageA.goto("/app/battles");
     await pageB.goto("/app/battles");
 
     await expect(pageA.getByTestId("ranked-queue-card")).toBeVisible();
     await expect(pageB.getByTestId("ranked-queue-card")).toBeVisible();
 
-    // Join ranked queue
     await pageA.getByTestId("ranked-queue-join").click();
     await pageA.waitForTimeout(500);
     await pageB.getByTestId("ranked-queue-join").click();
 
-    // Wait for match
     await expect(pageA).toHaveURL(/\/app\/battles\/room\?battleId=/, { timeout: 30000 });
-    await expect(pageB).toHaveURL(/\/app\/battles\/room\?battleId=/);
+    await expect(pageB).toHaveURL(/\/app\/battles\/room\?battleId=/, { timeout: 30000 });
 
     const battleIdA = new URL(pageA.url()).searchParams.get("battleId");
     const battleIdB = new URL(pageB.url()).searchParams.get("battleId");
