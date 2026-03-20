@@ -4,9 +4,36 @@ import Stripe from "stripe";
 import { getStripeClient } from "@/lib/payments/stripe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
+function getWebhookSecrets() {
+  return [
+    process.env.STRIPE_WEBHOOK_SECRET?.trim() || null,
+    process.env.STRIPE_BILLING_WEBHOOK_SECRET?.trim() || null,
+  ].filter((value): value is string => Boolean(value));
+}
+
+function constructStripeEvent(params: {
+  body: string;
+  signature: string;
+  stripe: Stripe;
+  secrets: string[];
+}) {
+  const { body, signature, stripe, secrets } = params;
+
+  let lastError: unknown = null;
+  for (const secret of secrets) {
+    try {
+      return stripe.webhooks.constructEvent(body, signature, secret);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("stripe_webhook_signature_verification_failed");
+}
+
 export async function POST(request: Request) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
+  const webhookSecrets = getWebhookSecrets();
+  if (webhookSecrets.length === 0) {
     return NextResponse.json({ error: "stripe_webhook_secret_missing" }, { status: 500 });
   }
 
@@ -20,7 +47,12 @@ export async function POST(request: Request) {
 
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+    event = constructStripeEvent({
+      body,
+      signature,
+      stripe,
+      secrets: webhookSecrets,
+    });
   } catch (error) {
     return NextResponse.json(
       {
@@ -75,31 +107,35 @@ export async function POST(request: Request) {
       const periodEnd = (subscription as unknown as { current_period_end?: number | null }).current_period_end;
       const userId = subscription.metadata.user_id;
       const planId = subscription.metadata.plan_id;
+      const subscriptionStatus =
+        subscription.status === "active"
+          ? "succeeded"
+          : subscription.status === "canceled"
+            ? "canceled"
+            : subscription.status === "past_due" || subscription.status === "unpaid"
+              ? "failed"
+              : "pending";
 
       if (userId) {
-        await adminClient
-          .from("user_billing_profiles")
-          .upsert(
-            {
-              user_id: userId,
-              stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
-              stripe_subscription_id: subscription.id,
-              active_subscription_plan: planId ?? null,
-              active_subscription_status: subscription.status,
-              subscription_current_period_end:
-                typeof periodEnd === "number"
-                  ? new Date(periodEnd * 1000).toISOString()
-                  : null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id" },
-          );
+        await adminClient.from("user_billing_profiles").upsert(
+          {
+            user_id: userId,
+            stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id,
+            stripe_subscription_id: subscription.id,
+            active_subscription_plan: planId ?? null,
+            active_subscription_status: subscription.status,
+            subscription_current_period_end:
+              typeof periodEnd === "number" ? new Date(periodEnd * 1000).toISOString() : null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
       }
 
       await adminClient
         .from("payment_ledger")
         .update({
-          status: subscription.status === "active" ? "succeeded" : subscription.status === "canceled" ? "canceled" : "pending",
+          status: subscriptionStatus,
           completed_at: subscription.status === "active" ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         })
