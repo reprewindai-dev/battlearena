@@ -9,6 +9,31 @@ type ParticipantRow = {
   slot: number;
 };
 
+async function promoteMatchedBattleToLive(params: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  battleId: string;
+  startedAt: string | null | undefined;
+}) {
+  const { supabase, battleId, startedAt } = params;
+  const now = new Date();
+  const { error } = await supabase
+    .from("battles")
+    .update({
+      status: "live",
+      started_at: startedAt ?? now.toISOString(),
+      current_round: 1,
+      voting_opened_at: now.toISOString(),
+      voting_closes_at: new Date(now.getTime() + 120_000).toISOString(),
+      updated_at: now.toISOString(),
+    })
+    .eq("id", battleId)
+    .eq("status", "matched");
+
+  if (error) {
+    throw new Error(`battle_live_promotion_failed:${error.message}`);
+  }
+}
+
 export async function POST(req: Request) {
   const user = await getSessionUser();
   if (!user) {
@@ -37,8 +62,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const username =
-    authData.user.email?.split("@")[0] ?? `user_${authData.user.id.slice(0, 8)}`;
+  const username = authData.user.email?.split("@")[0] ?? `user_${authData.user.id.slice(0, 8)}`;
   const { error: userError } = await supabase.from("users").upsert(
     {
       id: authData.user.id,
@@ -49,10 +73,7 @@ export async function POST(req: Request) {
   );
 
   if (userError) {
-    return NextResponse.json(
-      { error: "user_sync_failed", details: userError.message },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "user_sync_failed", details: userError.message }, { status: 400 });
   }
 
   const userId = authData.user.id;
@@ -60,28 +81,18 @@ export async function POST(req: Request) {
   const [{ data: battle, error: battleError }, { data: participants, error: participantsError }] = await Promise.all([
     supabase
       .from("battles")
-      .select("id,status,is_bot_battle")
+      .select("id,status,is_bot_battle,started_at")
       .eq("id", battleId)
       .maybeSingle(),
-    supabase
-      .from("battle_participants")
-      .select("user_id,slot")
-      .eq("battle_id", battleId)
-      .order("slot", { ascending: true }),
+    supabase.from("battle_participants").select("user_id,slot").eq("battle_id", battleId).order("slot", { ascending: true }),
   ]);
 
   if (battleError) {
-    return NextResponse.json(
-      { error: "battle_fetch_failed", details: battleError.message },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "battle_fetch_failed", details: battleError.message }, { status: 400 });
   }
 
   if (participantsError) {
-    return NextResponse.json(
-      { error: "participants_fetch_failed", details: participantsError.message },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "participants_fetch_failed", details: participantsError.message }, { status: 400 });
   }
 
   if (!battle) {
@@ -92,13 +103,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "battle_not_joinable" }, { status: 409 });
   }
 
-  if (battle.is_bot_battle) {
-    return NextResponse.json({ error: "bot_battle_has_no_open_slot" }, { status: 409 });
-  }
-
   const existingSelf = (participants ?? []).find((participant: ParticipantRow) => participant.user_id === userId);
   if (existingSelf) {
-    return NextResponse.json({ ok: true, mode: "supabase", battleId, slot: existingSelf.slot });
+    const shouldPromote = battle.status === "matched" && (Boolean(battle.is_bot_battle) || (participants?.length ?? 0) >= 2);
+    if (shouldPromote) {
+      await promoteMatchedBattleToLive({
+        supabase,
+        battleId,
+        startedAt: battle.started_at,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      mode: "supabase",
+      battleId,
+      slot: existingSelf.slot,
+      status: shouldPromote ? "live" : battle.status,
+    });
+  }
+
+  if (battle.is_bot_battle) {
+    return NextResponse.json({ error: "bot_battle_has_no_open_slot" }, { status: 409 });
   }
 
   const slotTwoTaken = (participants ?? []).some((participant: ParticipantRow) => participant.slot === 2);
@@ -106,9 +132,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "slot_taken" }, { status: 409 });
   }
 
-  const { error: insertError } = await supabase
-    .from("battle_participants")
-    .insert({ battle_id: battleId, user_id: userId, slot: 2 });
+  const { error: insertError } = await supabase.from("battle_participants").insert({ battle_id: battleId, user_id: userId, slot: 2 });
 
   if (insertError) {
     const code = (insertError as { code?: string }).code;
@@ -122,14 +146,26 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       if (existingError) {
-        return NextResponse.json(
-          { error: "join_failed", details: insertError.message },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "join_failed", details: insertError.message }, { status: 400 });
       }
 
       if (existing) {
-        return NextResponse.json({ ok: true, mode: "supabase", battleId, slot: existing.slot });
+        const shouldPromote = battle.status === "matched";
+        if (shouldPromote) {
+          await promoteMatchedBattleToLive({
+            supabase,
+            battleId,
+            startedAt: battle.started_at,
+          });
+        }
+
+        return NextResponse.json({
+          ok: true,
+          mode: "supabase",
+          battleId,
+          slot: existing.slot,
+          status: shouldPromote ? "live" : battle.status,
+        });
       }
 
       return NextResponse.json({ error: "slot_taken" }, { status: 409 });
@@ -139,11 +175,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
-    return NextResponse.json(
-      { error: "join_failed", details: insertError.message },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "join_failed", details: insertError.message }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, mode: "supabase", battleId, slot: 2 });
+  if (battle.status === "matched") {
+    await promoteMatchedBattleToLive({
+      supabase,
+      battleId,
+      startedAt: battle.started_at,
+    });
+  }
+
+  return NextResponse.json({
+    ok: true,
+    mode: "supabase",
+    battleId,
+    slot: 2,
+    status: battle.status === "matched" ? "live" : battle.status,
+  });
 }
