@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 type AuditLogRow = {
   id: string;
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   const action = url.searchParams.get("action");
   const q = url.searchParams.get("q");
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseServiceRoleClient();
 
   let query = supabase
     .from("admin_audit_log")

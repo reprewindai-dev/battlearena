@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { isTerminalBattleStatus } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+type ParticipantRow = {
+  user_id: string;
+  slot: number;
+};
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
@@ -50,6 +56,55 @@ export async function POST(req: Request) {
   }
 
   const userId = authData.user.id;
+
+  const [{ data: battle, error: battleError }, { data: participants, error: participantsError }] = await Promise.all([
+    supabase
+      .from("battles")
+      .select("id,status,is_bot_battle")
+      .eq("id", battleId)
+      .maybeSingle(),
+    supabase
+      .from("battle_participants")
+      .select("user_id,slot")
+      .eq("battle_id", battleId)
+      .order("slot", { ascending: true }),
+  ]);
+
+  if (battleError) {
+    return NextResponse.json(
+      { error: "battle_fetch_failed", details: battleError.message },
+      { status: 400 },
+    );
+  }
+
+  if (participantsError) {
+    return NextResponse.json(
+      { error: "participants_fetch_failed", details: participantsError.message },
+      { status: 400 },
+    );
+  }
+
+  if (!battle) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  if (isTerminalBattleStatus(battle.status)) {
+    return NextResponse.json({ error: "battle_not_joinable" }, { status: 409 });
+  }
+
+  if (battle.is_bot_battle) {
+    return NextResponse.json({ error: "bot_battle_has_no_open_slot" }, { status: 409 });
+  }
+
+  const existingSelf = (participants ?? []).find((participant: ParticipantRow) => participant.user_id === userId);
+  if (existingSelf) {
+    return NextResponse.json({ ok: true, mode: "supabase", battleId, slot: existingSelf.slot });
+  }
+
+  const slotTwoTaken = (participants ?? []).some((participant: ParticipantRow) => participant.slot === 2);
+  if (slotTwoTaken) {
+    return NextResponse.json({ error: "slot_taken" }, { status: 409 });
+  }
 
   const { error: insertError } = await supabase
     .from("battle_participants")

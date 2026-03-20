@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { loadBattleAccess } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(req: Request) {
@@ -22,7 +23,7 @@ export async function GET(req: Request) {
 
   const { data: row, error } = await supabase
     .from("battle_recordings")
-    .select("id,storage_bucket,storage_path")
+    .select("id,battle_id,storage_bucket,storage_path,uploaded_at")
     .eq("id", recordingId)
     .maybeSingle();
 
@@ -32,6 +33,17 @@ export async function GET(req: Request) {
 
   if (!row) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  const access = await loadBattleAccess({ supabase, battleId: row.battle_id, userId: user.id, role: "user" });
+  if (!access) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  if (!access.isParticipant && !access.canModerate) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (!row.uploaded_at) {
+    return NextResponse.json({ error: "recording_not_finalized" }, { status: 409 });
   }
 
   if (!row.storage_bucket || !row.storage_path) {

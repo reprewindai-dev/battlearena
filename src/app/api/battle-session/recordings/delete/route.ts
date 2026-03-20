@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
   const { data: row, error: fetchError } = await supabase
     .from("battle_recordings")
-    .select("id,storage_bucket,storage_path")
+    .select("id,battle_id,storage_bucket,storage_path")
     .eq("id", recordingId)
     .maybeSingle();
 

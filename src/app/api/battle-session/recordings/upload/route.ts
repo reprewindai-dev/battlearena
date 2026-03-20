@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { loadBattleAccess } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type UploadInitResponse =
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       ? ((body as Record<string, unknown>).bytes as unknown)
       : null;
 
-  if (!battleId) {
+  if (typeof battleId !== "string" || battleId.length === 0) {
     return NextResponse.json({ error: "missing_battleId" }, { status: 400 });
   }
 
@@ -50,6 +51,17 @@ export async function POST(req: Request) {
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const access = await loadBattleAccess({ supabase, battleId, userId: authData.user.id, role: "user" });
+  if (!access) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  if (!access.isParticipant) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  if (access.battle.status === "complete" || access.battle.status === "canceled") {
+    return NextResponse.json({ error: "battle_not_recordable" }, { status: 409 });
   }
 
   const bucket = "battle-recordings";

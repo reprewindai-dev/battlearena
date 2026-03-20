@@ -13,6 +13,9 @@ interface VideoBattleProductionProps {
   battleId: string;
   viewerUserId: string;
   localSlot: 1 | 2;
+  battleStatus?: string | null;
+  isBotBattle?: boolean;
+  mmrNeutral?: boolean;
   onStreamReady?: (stream: MediaStream) => void;
 }
 
@@ -20,6 +23,9 @@ export function VideoBattleProduction({
   battleId,
   viewerUserId,
   localSlot,
+  battleStatus,
+  isBotBattle = false,
+  mmrNeutral = false,
   onStreamReady,
 }: VideoBattleProductionProps) {
   const client = useMemo(() => new BattleLiveKitClient(), []);
@@ -112,6 +118,11 @@ export function VideoBattleProduction({
   }
 
   async function connectToRoom() {
+    if (battleStatus === "complete" || battleStatus === "canceled") {
+      setError("battle_not_joinable");
+      return;
+    }
+
     setIsConnecting(true);
     setError(null);
     const config = tokenConfig ?? (await fetchTokenConfig());
@@ -227,6 +238,12 @@ export function VideoBattleProduction({
             {participantsCount > 0 ? "Connected" : "Waiting"}
           </Badge>
         </div>
+
+        {isBotBattle ? (
+          <div className="mb-3 text-xs text-muted-foreground">
+            Bot match{mmrNeutral ? " · Ranked fallback is MMR neutral" : ""}.
+          </div>
+        ) : null}
 
         <div className="relative aspect-video rounded-lg bg-black overflow-hidden">
           <video

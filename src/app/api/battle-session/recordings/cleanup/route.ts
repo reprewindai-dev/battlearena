@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { loadBattleAccess } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
 
   const { data: row, error: fetchError } = await supabase
     .from("battle_recordings")
-    .select("id,storage_bucket,storage_path,uploaded_at")
+    .select("id,battle_id,created_by,storage_bucket,storage_path,uploaded_at")
     .eq("id", recordingId)
     .maybeSingle();
 
@@ -43,6 +44,14 @@ export async function POST(req: Request) {
 
   if (!row) {
     return NextResponse.json({ ok: true, mode: "supabase" as const });
+  }
+
+  const access = await loadBattleAccess({ supabase, battleId: row.battle_id, userId: authData.user.id, role: "user" });
+  if (!access) {
+    return NextResponse.json({ ok: true, mode: "supabase" as const });
+  }
+  if (!access.isParticipant || row.created_by !== authData.user.id) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   // Safety: only cleanup rows that were never finalized.

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSessionRole } from "@/lib/auth/session";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 export async function GET() {
   const role = await getSessionRole();
@@ -8,8 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+  const supabase = createSupabaseServiceRoleClient();
 
   const [
     usersRes,

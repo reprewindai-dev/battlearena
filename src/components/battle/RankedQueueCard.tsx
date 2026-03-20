@@ -4,15 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
-import { enqueue, getStatus } from "@/lib/matchmaking/client";
-import { getClientSessionUser } from "@/lib/auth/client-session";
+import { enqueue, getStatus, type MatchmakingResult } from "@/lib/matchmaking/client";
+import { getClientSessionUser, type SessionUser } from "@/lib/auth/client-session";
 import { getMatchmaking } from "@/lib/matchmaking/client";
 
 export function RankedQueueCard() {
   const [isQueued, setIsQueued] = useState(false);
-  const [queueStatus, setQueueStatus] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
+  const [queueStatus, setQueueStatus] = useState<MatchmakingResult | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -27,8 +28,9 @@ export function RankedQueueCard() {
 
     const interval = setInterval(async () => {
       try {
-        const status = await getStatus(user.id, "ranked");
+        const status = await getStatus("ranked");
         setQueueStatus(status);
+        setError(null);
 
         if (status.matched && status.battleId) {
           setIsQueued(false);
@@ -47,8 +49,9 @@ export function RankedQueueCard() {
 
     setLoading(true);
     try {
-      const result = await enqueue(user.id, "ranked");
+      const result = await enqueue("ranked");
       setQueueStatus(result);
+      setError(null);
 
       if (result.matched && result.battleId) {
         window.location.href = `/app/battles/room?battleId=${encodeURIComponent(result.battleId)}`;
@@ -67,9 +70,10 @@ export function RankedQueueCard() {
 
     try {
       const matchmaking = getMatchmaking();
-      await matchmaking.dequeue(user.id, "ranked");
+      await matchmaking.dequeue("ranked");
       setIsQueued(false);
       setQueueStatus(null);
+      setError(null);
     } catch (error) {
       console.error("Failed to leave ranked queue:", error);
     }
@@ -115,6 +119,7 @@ export function RankedQueueCard() {
               <div className="animate-pulse">
                 <p className="text-sm text-gray-600">Finding opponent...</p>
                 <p className="text-xs text-gray-500 mt-1">Queue time: {queuedSeconds}s</p>
+                <p className="text-xs text-gray-500 mt-1">Bot fallback at 45s if no human match is available.</p>
               </div>
             </div>
             <Button onClick={handleLeaveQueue} variant="outline" className="w-full" disabled={loading}>
@@ -126,6 +131,12 @@ export function RankedQueueCard() {
             {loading ? "Joining..." : "Join Ranked Queue"}
           </Button>
         )}
+
+        {queueStatus?.matched && queueStatus.isBotBattle ? (
+          <div className="text-xs text-muted-foreground">Matched against a ranked bot fallback. This match is MMR neutral.</div>
+        ) : null}
+
+        {error ? <div className="text-xs text-amber-200/90">{error}</div> : null}
       </div>
     </Card>
   );

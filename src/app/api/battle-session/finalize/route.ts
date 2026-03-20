@@ -1,11 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
+import { isTerminalBattleStatus, loadBattleAccess } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function isModOrAdmin(role: string | null) {
-  return role === "mod" || role === "admin";
-}
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
@@ -29,36 +26,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
 
-  const { data: battle, error: battleError } = await supabase
-    .from("battles")
-    .select("id,created_by,status,voting_opened_at,voting_closes_at,result")
-    .eq("id", battleId)
-    .maybeSingle();
-
-  if (battleError) {
-    return NextResponse.json(
-      { error: "battle_fetch_failed", details: battleError.message },
-      { status: 400 },
-    );
-  }
-
-  if (!battle) {
+  const access = await loadBattleAccess({ supabase, battleId, userId: user.id, role });
+  if (!access) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const allowed = battle.created_by === user.id || isModOrAdmin(role);
-  if (!allowed) {
+  if (!access.canManage) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  // Enforce: cannot finalize before voting closes
-  if (battle.voting_closes_at && new Date(battle.voting_closes_at) > new Date()) {
+  if (access.battle.status !== "live" && !isTerminalBattleStatus(access.battle.status)) {
+    return NextResponse.json({ error: "battle_not_live" }, { status: 409 });
+  }
+
+  if (access.battle.status === "canceled") {
+    return NextResponse.json({ error: "battle_canceled" }, { status: 409 });
+  }
+
+  if (access.battle.voting_closes_at && new Date(access.battle.voting_closes_at) > new Date()) {
     return NextResponse.json({ error: "voting_not_closed" }, { status: 400 });
   }
 
-  // Enforce: cannot finalize more than once (idempotency via result presence)
-  if (battle.result && typeof battle.result === "object" && "finalized_at" in battle.result) {
-    return NextResponse.json({ ok: true, mode: "supabase", battleId, result: battle.result, idempotent: true });
+  if (access.battle.result && typeof access.battle.result === "object" && "finalized_at" in access.battle.result) {
+    return NextResponse.json({ ok: true, mode: "supabase", battleId, result: access.battle.result, idempotent: true });
   }
 
   const { data: votes, error: votesError } = await supabase
@@ -89,6 +79,13 @@ export async function POST(req: Request) {
     counts: { 1: countA, 2: countB },
     winner_slot: winnerSlot,
     reason: "vote_counts",
+    mode: access.battle.mode ?? "freestyle",
+    queue_type: access.battle.queue_type ?? null,
+    battle_type: access.battle.battle_type ?? null,
+    is_bot_battle: Boolean(access.battle.is_bot_battle),
+    fallback_reason: access.battle.fallback_reason ?? "none",
+    wait_time_ms: access.battle.wait_time_ms ?? 0,
+    mmr_neutral: Boolean(access.battle.mmr_neutral),
   };
 
   const { error: updateParticipantsError } = await supabase
@@ -108,7 +105,7 @@ export async function POST(req: Request) {
 
   const { data: participants, error: participantsError } = await supabase
     .from("battle_participants")
-    .select("id,slot")
+    .select("id,user_id,slot")
     .eq("battle_id", battleId);
 
   if (participantsError) {
@@ -134,7 +131,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Stable per-battle idempotency key (allows retry without double-finalize)
   const idempotencyKey = `finalize:${battleId}`;
   const { data: rpcData, error: rpcError } = await supabase.rpc("record_battle_result", {
     p_idempotency_key: idempotencyKey,
@@ -149,7 +145,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Stable per-battle Elo idempotency key
   const ratingsIdempotencyKey = `elo:${battleId}`;
   const { data: eloData, error: eloError } = await supabase.rpc("apply_battle_elo_ratings", {
     p_idempotency_key: ratingsIdempotencyKey,
@@ -164,19 +159,17 @@ export async function POST(req: Request) {
     );
   }
 
-  // Enrich result with rating deltas if Elo succeeded
   const enrichedResult = {
     ...result,
     rating_deltas: eloData?.elo ?? null,
   };
 
-  // Post activity feed entry for community feed (fire-and-forget â€” never block finalize)
   try {
     const winnerParticipant = winnerSlot
-      ? (participants ?? []).find((p: any) => p.slot === winnerSlot)
+      ? (participants ?? []).find((p: { user_id?: string; slot?: number }) => p.slot === winnerSlot)
       : null;
     await supabase.from("activity_feed").insert({
-      actor_id: winnerParticipant?.id ?? user.id,
+      actor_id: winnerParticipant?.user_id ?? user.id,
       type: "battle_complete",
       entity_id: battleId,
       entity_type: "battle",
@@ -185,15 +178,15 @@ export async function POST(req: Request) {
         winner_slot: winnerSlot,
         votes_a: countA,
         votes_b: countB,
-        mode: battle.result && typeof battle.result === "object" && "mode" in battle.result
-          ? (battle.result as Record<string, unknown>).mode
-          : "freestyle",
+        mode: access.battle.mode ?? "freestyle",
+        battle_type: access.battle.battle_type ?? null,
+        is_bot_battle: Boolean(access.battle.is_bot_battle),
+        mmr_neutral: Boolean(access.battle.mmr_neutral),
       },
     });
   } catch {
-    // Non-critical â€” swallow silently
+    // Non-critical - swallow silently
   }
 
   return NextResponse.json({ ok: true, mode: "supabase", battleId, result: enrichedResult, rpc: rpcData, elo: eloData, idempotent: false });
 }
-

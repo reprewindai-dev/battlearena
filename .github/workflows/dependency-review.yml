@@ -3,7 +3,8 @@ name: Dependency Review
 on:
   pull_request:
     paths:
-      - "arena-web/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/dependency-review.yml"
 
 permissions:

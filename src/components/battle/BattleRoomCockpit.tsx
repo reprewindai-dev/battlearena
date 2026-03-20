@@ -36,6 +36,8 @@ type BattleSessionMetadata = {
   id: string;
   status: string;
   mode: string;
+  queue_type?: string | null;
+  battle_type?: string | null;
   created_by?: string | null;
   viewer_user_id?: string | null;
   started_at?: string | null;
@@ -47,6 +49,10 @@ type BattleSessionMetadata = {
   voting_opened_at?: string | null;
   voting_closes_at?: string | null;
   result?: unknown | null;
+  is_bot_battle?: boolean;
+  fallback_reason?: string | null;
+  wait_time_ms?: number | null;
+  mmr_neutral?: boolean;
   participants: BattleParticipant[];
 };
 
@@ -405,7 +411,7 @@ export function BattleRoomCockpit() {
   const statusBadge =
     battleStatus === "live"
       ? { label: `LIVE (${sessionMode ?? "..."})`, className: "bg-emerald-500/15 text-emerald-200" }
-      : battleStatus === "queued" || battleStatus === "draft"
+      : battleStatus === "queued" || battleStatus === "draft" || battleStatus === "matched"
         ? { label: `${battleStatus.toUpperCase()} (${sessionMode ?? "..."})`, className: "bg-amber-500/15 text-amber-200" }
         : battleStatus === "complete"
           ? { label: `COMPLETE (${sessionMode ?? "..."})`, className: "bg-slate-500/20 text-slate-200" }
@@ -431,6 +437,12 @@ export function BattleRoomCockpit() {
   const viewerUserId = sessionMeta?.viewer_user_id ?? viewerUserIdFallback;
   const localSlot = slotA?.user_id === viewerUserId ? 1 : slotB?.user_id === viewerUserId ? 2 : 1;
   const showJoinAsB = Boolean(sessionId && !slotB);
+  const battleTypeLabel = sessionMeta?.battle_type
+    ? sessionMeta.battle_type.replace(/_/g, " ")
+    : sessionMeta?.queue_type
+      ? sessionMeta.queue_type.replace(/_/g, " ")
+      : sessionMeta?.mode ?? "battle";
+  const waitSeconds = Math.max(0, Math.floor((sessionMeta?.wait_time_ms ?? 0) / 1000));
 
   function formatParticipantLabel(p: BattleParticipant | null) {
     if (!p) return "--------";
@@ -1192,6 +1204,14 @@ export function BattleRoomCockpit() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Badge className={statusBadge.className}>{statusBadge.label}</Badge>
+            {sessionMeta?.is_bot_battle ? (
+              <Badge variant="secondary">
+                Bot match{sessionMeta.mmr_neutral ? " · MMR neutral" : ""}
+              </Badge>
+            ) : null}
+            <Badge variant="outline" className="capitalize">
+              {battleTypeLabel}
+            </Badge>
             <div className="text-xs text-muted-foreground">
               Round <span className="text-foreground">{round}</span>
             </div>
@@ -1212,6 +1232,14 @@ export function BattleRoomCockpit() {
               Status{" "}
               <span className="text-foreground">{sessionMeta?.status ?? "--"}</span>
             </div>
+            {sessionMeta?.fallback_reason === "timed_bot_fallback" ? (
+              <>
+                <Separator orientation="vertical" className="mx-1 h-4" />
+                <div className="text-xs text-muted-foreground">
+                  Fallback <span className="text-foreground">bot after {waitSeconds}s</span>
+                </div>
+              </>
+            ) : null}
             <Separator orientation="vertical" className="mx-1 h-4" />
             <div className="text-xs text-muted-foreground">
               A{" "}
@@ -1280,6 +1308,9 @@ export function BattleRoomCockpit() {
           battleId={sessionId}
           viewerUserId={sessionMeta?.viewer_user_id ?? viewerUserIdFallback ?? ""}
           localSlot={localSlot}
+          battleStatus={sessionMeta?.status ?? null}
+          isBotBattle={Boolean(sessionMeta?.is_bot_battle)}
+          mmrNeutral={Boolean(sessionMeta?.mmr_neutral)}
           onStreamReady={async (stream) => {
             // Check video session limit before tracking
             const canUseVideo = await checkUsageLimit("video_session");

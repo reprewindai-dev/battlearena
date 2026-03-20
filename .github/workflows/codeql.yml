@@ -6,11 +6,21 @@ on:
       - main
       - master
     paths:
-      - "arena-web/**"
+      - "src/**"
+      - "e2e/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.*"
+      - "tsconfig*.json"
       - ".github/workflows/codeql.yml"
   pull_request:
     paths:
-      - "arena-web/**"
+      - "src/**"
+      - "e2e/**"
+      - "package.json"
+      - "package-lock.json"
+      - "next.config.*"
+      - "tsconfig*.json"
       - ".github/workflows/codeql.yml"
   schedule:
     - cron: "31 3 * * 1"

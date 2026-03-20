@@ -10,15 +10,15 @@ export function getMatchmaking() {
   return new ClientMatchmaking();
 }
 
-export async function enqueue(userId: string, mode: "freestyle" | "ranked" | "tournament") {
-  return enqueueApi(userId, mode);
+export async function enqueue(_userId: string, mode: "freestyle" | "ranked" | "tournament") {
+  return enqueueApi(mode);
 }
 
-export async function getStatus(userId: string, mode: "freestyle" | "ranked" | "tournament") {
-  return getStatusApi(userId, mode);
+export async function getStatus(_userId: string, mode: "freestyle" | "ranked" | "tournament") {
+  return getStatusApi(mode);
 }
 
-export async function leaveQueue(userId: string, mode: "freestyle" | "ranked" | "tournament") {
+export async function leaveQueue(_userId: string, mode: "freestyle" | "ranked" | "tournament") {
   const matchmaking = getMatchmaking();
-  await matchmaking.dequeue(userId, mode);
+  await matchmaking.dequeue(mode);
 }

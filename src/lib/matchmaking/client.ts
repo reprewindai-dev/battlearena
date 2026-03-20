@@ -15,7 +15,6 @@ export interface MatchmakingResult {
 
 export class ClientMatchmaking {
   async enqueue(
-    _userId: string,
     queueType: QueueType,
     options: {
       battleFormat?: BattleFormat;
@@ -48,11 +47,11 @@ export class ClientMatchmaking {
     return payload as MatchmakingResult;
   }
 
-  async dequeue(_userId: string, queueType: QueueType = "freestyle"): Promise<void> {
-    await this.enqueue(_userId, queueType, { leave: true });
+  async dequeue(queueType: QueueType = "freestyle"): Promise<void> {
+    await this.enqueue(queueType, { leave: true });
   }
 
-  async getStatus(_userId: string, queueType: QueueType = "freestyle"): Promise<MatchmakingResult> {
+  async getStatus(queueType: QueueType = "freestyle"): Promise<MatchmakingResult> {
     const query = new URLSearchParams({ mode: queueType });
     const response = await fetch(`/api/matchmaking/status?${query.toString()}`, {
       method: "GET",
@@ -89,15 +88,14 @@ export function getMatchmaking() {
 }
 
 export const enqueue = async (
-  userId: string,
   queueType: QueueType,
   options?: { battleFormat?: BattleFormat; preferredGenres?: string[]; leave?: boolean; idempotencyKey?: string },
 ) => {
   const matchmaking = getMatchmaking();
-  return matchmaking.enqueue(userId, queueType, options);
+  return matchmaking.enqueue(queueType, options);
 };
 
-export const getStatus = async (userId: string, queueType: QueueType = "freestyle") => {
+export const getStatus = async (queueType: QueueType = "freestyle") => {
   const matchmaking = getMatchmaking();
-  return matchmaking.getStatus(userId, queueType);
+  return matchmaking.getStatus(queueType);
 };

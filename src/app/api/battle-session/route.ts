@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { isModOrAdmin, type SessionRole } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type BattleParticipant = {
@@ -21,6 +22,8 @@ type BattleSession = {
   id: string;
   status: string;
   mode: string;
+  queue_type?: string | null;
+  battle_type?: string | null;
   created_by?: string | null;
   viewer_user_id?: string | null;
   started_at?: string | null;
@@ -32,12 +35,12 @@ type BattleSession = {
   created_at: string | null;
   can_manage?: boolean;
   viewer_role?: string | null;
+  is_bot_battle?: boolean;
+  fallback_reason?: string | null;
+  wait_time_ms?: number | null;
+  mmr_neutral?: boolean;
   participants: BattleParticipant[];
 };
-
-function isModOrAdmin(role: string | null) {
-  return role === "mod" || role === "admin";
-}
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -57,14 +60,18 @@ export async function GET(req: Request) {
   }
 
   const { data: authData } = await supabase.auth.getUser();
-  const role =
+  const rawRole =
     (authData?.user?.app_metadata as { role?: string } | undefined)?.role ??
     (authData?.user?.user_metadata as { role?: string } | undefined)?.role ??
     null;
+  const role: SessionRole =
+    rawRole === "admin" || rawRole === "mod" || rawRole === "user"
+      ? rawRole
+      : null;
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")
-    .select("*")
+    .select("id,created_by,status,mode,queue_type,battle_type,started_at,ended_at,current_round,voting_opened_at,voting_closes_at,result,created_at,is_bot_battle,fallback_reason,wait_time_ms,mmr_neutral")
     .eq("id", battleId)
     .maybeSingle();
 
@@ -143,6 +150,8 @@ export async function GET(req: Request) {
     created_by: battle.created_by,
     status: battle.status,
     mode: battle.mode,
+    queue_type: (battle as { queue_type?: string | null }).queue_type ?? null,
+    battle_type: (battle as { battle_type?: string | null }).battle_type ?? null,
     viewer_user_id: user.id,
     started_at: battle.started_at,
     ended_at: battle.ended_at,
@@ -153,6 +162,10 @@ export async function GET(req: Request) {
     created_at: battle.created_at,
     can_manage: battle.created_by === user.id || isModOrAdmin(role),
     viewer_role: role,
+    is_bot_battle: Boolean((battle as { is_bot_battle?: boolean | null }).is_bot_battle),
+    fallback_reason: (battle as { fallback_reason?: string | null }).fallback_reason ?? null,
+    wait_time_ms: (battle as { wait_time_ms?: number | null }).wait_time_ms ?? null,
+    mmr_neutral: Boolean((battle as { mmr_neutral?: boolean | null }).mmr_neutral),
     participants: hydratedParticipants,
   };
 
