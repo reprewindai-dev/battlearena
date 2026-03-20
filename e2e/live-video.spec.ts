@@ -13,7 +13,7 @@ type Credentials = {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const livekitHealthUrl = process.env.LIVEKIT_HEALTH_URL ?? "http://127.0.0.1:7880/";
+const livekitHealthUrl = process.env.LIVEKIT_HEALTH_URL;
 const hasLiveVideoEnv = Boolean(supabaseUrl && serviceRoleKey);
 
 const adminClient = hasLiveVideoEnv
@@ -81,15 +81,17 @@ test("two authenticated users can publish and observe live video state", async (
   test.setTimeout(180_000);
   test.skip(!hasLiveVideoEnv, "Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
 
-  try {
-    const health = await fetch(livekitHealthUrl);
-    if (!health.ok) {
-      throw new Error(`livekit_unhealthy_status:${health.status}`);
+  if (livekitHealthUrl) {
+    try {
+      const health = await fetch(livekitHealthUrl);
+      if (!health.ok) {
+        throw new Error(`livekit_unhealthy_status:${health.status}`);
+      }
+    } catch (error) {
+      throw new Error(
+        `livekit_not_reachable:${livekitHealthUrl}:${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-  } catch (error) {
-    throw new Error(
-      `livekit_not_reachable:${livekitHealthUrl}:${error instanceof Error ? error.message : String(error)}`,
-    );
   }
 
   const userA = await createVerifiedUser("video_a");
