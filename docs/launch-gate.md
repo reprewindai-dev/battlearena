@@ -93,11 +93,15 @@ Recent workflow hardening completed:
 - `Cleanup stale battle recordings` passes on current `main`
 - `CodeQL` passes on current `main`
 - manual Render smoke action exists at `.github/workflows/render-live-smoke.yml`
+- manual Render live video action exists at `.github/workflows/render-live-video.yml`
+- manual Render matchmaking bot action exists at `.github/workflows/render-matchmaking-bot.yml`
+- automated two-user live battle video verification passed against Render via GitHub Actions
+- automated timed bot fallback verification passed against Render for:
+  - freestyle bot fallback contract
+  - ranked MMR-neutral bot fallback contract
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
-- full two-user live battle verification against production LiveKit from automated E2E
-- timed bot fallback verification against production with audited battle metadata
 - full Stripe webhook-to-profile reconciliation verification in production after live payment events
 - tournament registration debit and refund verification against production balances
 - production beat ingestion verification from storage-backed uploads through front-end playback
