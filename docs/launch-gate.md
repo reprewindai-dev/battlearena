@@ -95,16 +95,26 @@ Recent workflow hardening completed:
 - manual Render smoke action exists at `.github/workflows/render-live-smoke.yml`
 - manual Render live video action exists at `.github/workflows/render-live-video.yml`
 - manual Render matchmaking bot action exists at `.github/workflows/render-matchmaking-bot.yml`
+- manual Render beats runtime action exists at `.github/workflows/render-beats-runtime.yml`
+- manual Render tournaments runtime action exists at `.github/workflows/render-tournaments-runtime.yml`
 - automated two-user live battle video verification passed against Render via GitHub Actions
 - automated timed bot fallback verification passed against Render for:
   - freestyle bot fallback contract
   - ranked MMR-neutral bot fallback contract
+- automated beat runtime verification passed against Render for:
+  - admin-only upload enforcement
+  - storage-backed beat persistence
+  - beat library visibility
+  - public asset fetchability for audio and preview URLs
+- automated tournament runtime verification passed against Render for:
+  - admin-created tournament registration flow
+  - canonical `user_profiles.token_balance` debit on entry
+  - duplicate registration does not double-charge
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
 - full Stripe webhook-to-profile reconciliation verification in production after live payment events
-- tournament registration debit and refund verification against production balances
-- production beat ingestion verification from storage-backed uploads through front-end playback
+- tournament refund-path verification after a downstream registration failure
 - Docker Scout image scan rerun after local Docker service stability is restored
 - direct confirmation that Render has `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` set in the live service env
 
