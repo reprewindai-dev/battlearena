@@ -1,6 +1,6 @@
 // Ingest BeatStars-quality CC0 beats from Pixabay into Supabase beats table/storage
 // Requirements: set env SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PIXABAY_API_KEY
-// Optional: BUCKET_BEATS (default: beats), INGEST_USER_EMAIL (default: beats-ingest@system.local)
+// Optional: BEATS_STORAGE_BUCKET (default: beats), INGEST_USER_EMAIL (default: beats-ingest@system.local)
 // Run: node scripts/ingest-pixabay-beats.mjs
 
 import { createClient } from "@supabase/supabase-js";
@@ -9,11 +9,11 @@ const {
   SUPABASE_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   PIXABAY_API_KEY,
-  BUCKET_BEATS = "beats",
   INGEST_USER_EMAIL = "beats-ingest@system.local",
   INGEST_USER_ID,
   INGEST_USER_PASSWORD,
 } = process.env;
+const BEATS_STORAGE_BUCKET = process.env.BEATS_STORAGE_BUCKET ?? process.env.BUCKET_BEATS ?? "beats";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !PIXABAY_API_KEY) {
   console.error("Missing env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PIXABAY_API_KEY are required");
@@ -70,9 +70,9 @@ const FALLBACK_TRACKS = [
 async function ensureBucket() {
   const { data: buckets, error } = await supabase.storage.listBuckets();
   if (error) throw error;
-  const exists = buckets?.some((b) => b.name === BUCKET_BEATS);
+  const exists = buckets?.some((b) => b.name === BEATS_STORAGE_BUCKET);
   if (!exists) {
-    const { error: createError } = await supabase.storage.createBucket(BUCKET_BEATS, {
+    const { error: createError } = await supabase.storage.createBucket(BEATS_STORAGE_BUCKET, {
       public: true,
     });
     if (createError) throw createError;
@@ -82,7 +82,6 @@ async function ensureBucket() {
 async function getIngestUserId() {
   if (INGEST_USER_ID) return INGEST_USER_ID;
 
-  // Try listUsers via admin API and match email
   const { data: listed, error: listErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
   if (listErr) {
     throw new Error(`auth admin listUsers failed: ${listErr.message}`);
@@ -90,12 +89,10 @@ async function getIngestUserId() {
   const found = listed?.users?.find((u) => u.email === INGEST_USER_EMAIL);
   if (found?.id) return found.id;
 
-  // If any user exists, fallback to the first one
   if (listed?.users?.length) {
     return listed.users[0].id;
   }
 
-  // Create via admin API
   const { data: created, error: createErr } = await supabase.auth.admin.createUser({
     email: INGEST_USER_EMAIL,
     email_confirm: true,
@@ -104,9 +101,7 @@ async function getIngestUserId() {
     app_metadata: { role: "ingest" },
   });
   if (createErr || !created?.user?.id) {
-    console.warn(
-      `Ingest user not found and create failed (${INGEST_USER_EMAIL}): ${listErr?.message ?? createErr?.message}`
-    );
+    console.warn(`Ingest user not found and create failed (${INGEST_USER_EMAIL}): ${listErr?.message ?? createErr?.message}`);
     return null;
   }
   return created.user.id;
@@ -161,15 +156,13 @@ async function downloadBuffer(url) {
 }
 
 async function uploadTrack(path, buffer, contentType = "audio/mpeg") {
-  const { data, error } = await supabase.storage
-    .from(BUCKET_BEATS)
-    .upload(path, buffer, { contentType, upsert: true });
+  const { data, error } = await supabase.storage.from(BEATS_STORAGE_BUCKET).upload(path, buffer, { contentType, upsert: true });
   if (error) throw error;
   return data?.path;
 }
 
 function publicUrl(path) {
-  const { data } = supabase.storage.from(BUCKET_BEATS).getPublicUrl(path);
+  const { data } = supabase.storage.from(BEATS_STORAGE_BUCKET).getPublicUrl(path);
   return data.publicUrl;
 }
 
@@ -192,7 +185,7 @@ async function insertBeat({ track, storagePath, fileUrl, ingestUserId }) {
       is_active: true,
       status: "active",
     },
-    { onConflict: "file_url" }
+    { onConflict: "file_url" },
   );
   if (error) throw error;
   return storagePath;

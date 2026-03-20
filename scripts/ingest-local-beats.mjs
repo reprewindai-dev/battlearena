@@ -1,16 +1,13 @@
 // Ingest local beat files from tmp/local_beats into Supabase storage and beats table
-// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BUCKET_BEATS (default beats)
+// Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BEATS_STORAGE_BUCKET (default beats)
 // Run: node scripts/ingest-local-beats.mjs
 
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
 
-const {
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  BUCKET_BEATS = "beats",
-} = process.env;
+const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+const BEATS_STORAGE_BUCKET = process.env.BEATS_STORAGE_BUCKET ?? process.env.BUCKET_BEATS ?? "beats";
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -28,9 +25,9 @@ const SOURCE = "local_pack";
 async function ensureBucket() {
   const { data: buckets, error } = await supabase.storage.listBuckets();
   if (error) throw error;
-  const exists = buckets?.some((b) => b.name === BUCKET_BEATS);
+  const exists = buckets?.some((b) => b.name === BEATS_STORAGE_BUCKET);
   if (!exists) {
-    const { error: createError } = await supabase.storage.createBucket(BUCKET_BEATS, { public: true });
+    const { error: createError } = await supabase.storage.createBucket(BEATS_STORAGE_BUCKET, { public: true });
     if (createError) throw createError;
   }
 }
@@ -55,10 +52,8 @@ function walkFiles(root) {
 function extractProducer(filePath) {
   const name = path.basename(filePath);
   const parent = path.basename(path.dirname(filePath));
-  // From filename e.g., "Something - Trap - Prod.WizardOfAus.wav"
   const prodMatch = name.match(/prod\.([A-Za-z0-9_]+)/i);
   if (prodMatch) return prodMatch[1];
-  // From parent folder e.g., MASSIVE BEAT PACK 2025 -> WizardOfAus inferred
   if (/wizardofaus/i.test(parent)) return "WizardOfAus";
   if (/alias/i.test(parent)) return "PRODBYALIAS";
   if (/layz/i.test(parent)) return "Prod.LayZ";
@@ -79,7 +74,7 @@ function extractTempo(filePath) {
   const candidate = matchName?.[1] || matchBracket?.[1] || matchParent?.[1];
   const tempo = candidate ? parseInt(candidate, 10) : null;
   if (tempo && tempo >= 60 && tempo <= 220) return tempo;
-  return 90; // safe default to satisfy NOT NULL
+  return 90;
 }
 
 function inferGenre(filePath) {
@@ -112,7 +107,7 @@ function slugifyName(name) {
 
 async function uploadFile(filePath) {
   const stats = fs.statSync(filePath);
-  const maxBytes = 50 * 1024 * 1024; // Supabase storage default max size ~50MB
+  const maxBytes = 50 * 1024 * 1024;
   if (stats.size > maxBytes) {
     throw new Error(`File exceeds max size (${(stats.size / 1024 / 1024).toFixed(1)}MB)`);
   }
@@ -121,12 +116,12 @@ async function uploadFile(filePath) {
   const ext = path.extname(filePath).slice(1) || "mp3";
   const contentType = contentTypeForExt(ext);
   const destPath = `local/${slugifyName(path.basename(filePath))}`;
-  const { data, error } = await supabase.storage.from(BUCKET_BEATS).upload(destPath, buffer, {
+  const { error } = await supabase.storage.from(BEATS_STORAGE_BUCKET).upload(destPath, buffer, {
     contentType,
     upsert: true,
   });
   if (error) throw error;
-  const { data: pub } = supabase.storage.from(BUCKET_BEATS).getPublicUrl(destPath);
+  const { data: pub } = supabase.storage.from(BEATS_STORAGE_BUCKET).getPublicUrl(destPath);
   return { path: destPath, publicUrl: pub.publicUrl };
 }
 
@@ -150,7 +145,6 @@ async function insertBeat(meta) {
   };
 
   const attemptInsert = async () => supabase.from("beats").insert(payload);
-
   let { error } = await attemptInsert();
 
   if (error && /uploaded_by/.test(error.message || "")) {

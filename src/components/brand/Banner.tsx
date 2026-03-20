@@ -102,7 +102,7 @@ export const HeroBanner = ({ className = "" }) => {
               href="/app/battles"
               className="px-8 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl transition-all inline-flex"
             >
-              ENTER SPITZONE
+              ENTER BATTLE ARENA
             </Link>
           </motion.div>
           <motion.div
@@ -176,3 +176,4 @@ export const BattleBanner = ({ battle, className = "" }: { battle: Battle; class
     </div>
   );
 };
+

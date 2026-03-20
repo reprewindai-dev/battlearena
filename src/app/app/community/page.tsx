@@ -6,7 +6,7 @@ import { CommunityMentorships } from "@/components/community/CommunityMentorship
 import { CommunityEvents } from "@/components/community/CommunityEvents";
 import { Separator } from "@/components/ui/separator";
 
-export const metadata = { title: "Community - Spitzone" };
+export const metadata = { title: "Community - Battle Arena" };
 
 export default function CommunityPage() {
   return (
@@ -14,7 +14,7 @@ export default function CommunityPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Community</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Live activity, rankings, and everything happening in Spitzone.
+          Live activity, rankings, and everything happening in Battle Arena.
         </p>
       </div>
 
@@ -41,5 +41,6 @@ export default function CommunityPage() {
     </div>
   );
 }
+
 
 

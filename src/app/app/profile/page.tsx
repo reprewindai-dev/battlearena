@@ -4,7 +4,7 @@ import { PlayerProfile } from "@/components/community/PlayerProfile";
 import { BattleHistory } from "@/components/community/BattleHistory";
 import { Separator } from "@/components/ui/separator";
 
-export const metadata = { title: "My Profile - Spitzone" };
+export const metadata = { title: "My Profile - Battle Arena" };
 
 export default async function ProfilePage() {
   const user = await getSessionUser();
@@ -20,6 +20,7 @@ export default async function ProfilePage() {
     </div>
   );
 }
+
 
 
 

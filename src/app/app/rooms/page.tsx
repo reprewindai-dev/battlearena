@@ -1,6 +1,6 @@
 import { RoomLobby } from "@/components/rooms/RoomLobby";
 
-export const metadata = { title: "Rooms & Lobbies - Spitzone" };
+export const metadata = { title: "Rooms & Lobbies - Battle Arena" };
 
 export default function RoomsPage() {
   return (
@@ -16,6 +16,7 @@ export default function RoomsPage() {
     </div>
   );
 }
+
 
 
 

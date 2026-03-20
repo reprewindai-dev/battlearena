@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { getSessionUser } from "@/lib/auth/session";
 
-export const metadata = { title: "Spitzone Home" };
+export const metadata = { title: "Battle Arena Home" };
 
 const QUICK_ACTIONS = [
   { href: "/app/battles", label: "Find a Battle", description: "Join a live queue or create a room.", tag: "LIVE", primary: true },
@@ -27,7 +27,7 @@ export default async function AppHomePage() {
           Welcome{user?.email ? `, ${user.email.split("@")[0]}` : ""}.
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Spitzone is live. Queue up, battle, and hold your place on the board.
+          Battle Arena is live. Queue up, battle, and hold your place on the board.
         </p>
       </div>
 
@@ -75,3 +75,4 @@ export default async function AppHomePage() {
     </div>
   );
 }
+

@@ -142,7 +142,7 @@ export const PremiumMobileLayout: React.FC<PremiumMobileLayoutProps> = ({ childr
                   className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                   onClick={() => navigateTo('/app/battles')}
                 >
-                  Enter SPITZONE
+                  Enter BATTLE ARENA
                 </Button>
               </div>
             </motion.div>
@@ -491,3 +491,4 @@ export const MobileSearchBar: React.FC<MobileSearchBarProps> = ({
     </form>
   );
 };
+

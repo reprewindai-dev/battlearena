@@ -68,7 +68,7 @@ export default function SignupPage() {
         return;
       }
 
-      setSuccess("Account created. Check your email to confirm your Spitzone account before signing in.");
+      setSuccess("Account created. Check your email to confirm your Battle Arena account before signing in.");
     } catch {
       setError(
         "Signup is temporarily unavailable. Try again in a moment.",
@@ -81,7 +81,7 @@ export default function SignupPage() {
       <div className="md:col-span-6">
         <h1 className="text-3xl font-semibold tracking-tight">Sign up</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Create your Spitzone account to enter live battles.
+          Create your Battle Arena account to enter live battles.
         </p>
       </div>
 
@@ -140,3 +140,4 @@ export default function SignupPage() {
     </div>
   );
 }
+
