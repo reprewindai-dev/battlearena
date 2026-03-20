@@ -150,7 +150,7 @@ export function BeatLibrary({ onBeatSelect, selectedBeatId, canUpload = false }:
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-2 text-sm text-muted-foreground">
               <Filter className="h-4 w-4" />
-              Tempo: {tempoRange[0]}–{tempoRange[1]} BPM
+              Tempo: {tempoRange[0]}-{tempoRange[1]} BPM
             </div>
             <Slider value={tempoRange} onValueChange={setTempoRange} min={60} max={200} step={5} />
           </div>
@@ -213,7 +213,7 @@ export function BeatLibrary({ onBeatSelect, selectedBeatId, canUpload = false }:
         )}
       </div>
 
-      {/* Upload FAB — admins/mods only */}
+      {/* Upload FAB - admins/mods only */}
       {canUpload && (
         <div className="fixed bottom-8 right-8 z-30">
           <Button
@@ -235,3 +235,4 @@ export function BeatLibrary({ onBeatSelect, selectedBeatId, canUpload = false }:
     </div>
   );
 }
+
