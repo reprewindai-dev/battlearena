@@ -26,7 +26,8 @@
     "verify:security": "ts-node scripts/verify-security.ts",
     "verify:load": "ts-node scripts/verify-load.ts",
     "test:e2e:live": "playwright test e2e/smoke.spec.ts -c playwright.config.mts",
-    "test:e2e:live-video": "playwright test e2e/live-video.spec.ts -c playwright.config.mts"
+    "test:e2e:live-video": "playwright test e2e/live-video.spec.ts -c playwright.config.mts",
+    "test:e2e:matchmaking-bot": "playwright test e2e/matchmaking-bot.spec.ts -c playwright.config.mts"
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.8",
