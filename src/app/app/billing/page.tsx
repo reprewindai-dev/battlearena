@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SubscriptionCard } from "@/components/billing/SubscriptionCard";
+import { StripeCheckoutDialog } from "@/components/payment/StripeCheckoutDialog";
 import type { SubscriptionPlanId } from "@/lib/payments/catalog";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
@@ -23,41 +24,70 @@ const PLAN_LIMITS: Record<SubscriptionPlanId, { battlesPerMonth: string; apiCall
   premium: { battlesPerMonth: "Unlimited", apiCallsPerMonth: "Unlimited" },
 };
 
+const PLAN_LABELS: Record<SubscriptionPlanId, string> = {
+  spectator: "Spectator",
+  pro: "Pro",
+  premium: "Premium",
+};
+
 export default function BillingPage() {
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isUpgrading, setIsUpgrading] = React.useState(false);
   const [isOpeningPortal, setIsOpeningPortal] = React.useState(false);
+  const [checkoutOpen, setCheckoutOpen] = React.useState(false);
+  const [checkoutClientSecret, setCheckoutClientSecret] = React.useState<string | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = React.useState<SubscriptionPlanId | null>(null);
 
   const supabase = createSupabaseBrowserClient();
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
 
-  React.useEffect(() => {
-    async function loadProfile() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+  const loadProfile = React.useCallback(async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setProfile(null);
+        return;
+      }
 
-        const { data: profile } = await supabase
-          .from("user_billing_profiles")
-          .select("active_subscription_plan, active_subscription_status, subscription_current_period_end, stripe_customer_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
+      const { data: billingProfile } = await supabase
+        .from("user_billing_profiles")
+        .select("active_subscription_plan, active_subscription_status, subscription_current_period_end, stripe_customer_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-        setProfile(profile ?? {
+      setProfile(
+        billingProfile ?? {
           active_subscription_plan: null,
           active_subscription_status: null,
           subscription_current_period_end: null,
           stripe_customer_id: null,
-        });
-      } catch (error) {
-        console.error("Failed to load profile:", error);
+        },
+      );
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+    }
+  }, [supabase]);
+
+  React.useEffect(() => {
+    async function bootstrap() {
+      try {
+        await loadProfile();
       } finally {
         setIsLoading(false);
       }
     }
 
-    loadProfile();
-  }, [supabase]);
+    void bootstrap();
+  }, [loadProfile]);
+
+  function resetCheckout() {
+    setCheckoutOpen(false);
+    setCheckoutClientSecret(null);
+    setCheckoutPlan(null);
+  }
 
   async function handleUpgrade(plan: SubscriptionPlanId) {
     setIsUpgrading(true);
@@ -70,22 +100,28 @@ export default function BillingPage() {
         body: JSON.stringify({ plan_id: plan }),
       });
 
-      const data = (await response.json().catch(() => null)) as { error?: string; client_secret?: string | null; status?: string } | null;
+      const data = (await response.json().catch(() => null)) as { error?: string; details?: string; client_secret?: string | null; status?: string } | null;
       if (!response.ok) {
-        throw new Error(data?.error ?? "Failed to create subscription");
+        throw new Error(data?.details ?? data?.error ?? "Failed to create subscription");
       }
 
       if (data?.status === "active") {
+        await loadProfile();
         toast.success("Subscription activated.");
         return;
       }
 
-      if (data?.client_secret) {
-        toast.success("Subscription created. Complete payment in Stripe Elements flow.");
-        return;
+      if (!data?.client_secret) {
+        throw new Error("Stripe did not return a client secret for this subscription.");
       }
 
-      toast.success("Subscription request created.");
+      if (!publishableKey) {
+        throw new Error("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing");
+      }
+
+      setCheckoutPlan(plan);
+      setCheckoutClientSecret(data.client_secret);
+      setCheckoutOpen(true);
     } catch (error) {
       console.error("Failed to create subscription:", error);
       toast.error(error instanceof Error ? error.message : "Failed to create subscription");
@@ -145,91 +181,104 @@ export default function BillingPage() {
   const currentPlan = profile.active_subscription_plan;
   const currentPlanForDisplay = currentPlan ?? "spectator";
   const planLimits = PLAN_LIMITS[currentPlanForDisplay];
+  const checkoutPlanLabel = checkoutPlan ? PLAN_LABELS[checkoutPlan] : "Subscription";
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Billing</h1>
-        <p className="text-muted-foreground">Manage your subscription and usage</p>
-      </div>
-
-      {/* Current Plan Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Current Plan
-            <Badge variant={currentPlan ? "default" : "secondary"}>
-              {currentPlan ? currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) : "No Active Plan"}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium">Status</p>
-              <p className="text-sm text-muted-foreground capitalize">
-                {profile.active_subscription_status || "inactive"}
-              </p>
-            </div>
-            {profile.subscription_current_period_end && (
-              <div>
-                <p className="text-sm font-medium">Renews</p>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(profile.subscription_current_period_end).toLocaleDateString()}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm font-medium">Battle Access</p>
-              <p className="text-sm text-muted-foreground">
-                {planLimits.battlesPerMonth}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium">API Access</p>
-              <p className="text-sm text-muted-foreground">
-                {planLimits.apiCallsPerMonth}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Upgrade Options */}
-      <div>
-        <h2 className="text-2xl font-bold mb-4">Upgrade Your Plan</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {(["spectator", "pro", "premium"] as const).map((planType) => (
-            <SubscriptionCard
-              key={planType}
-              plan={planType}
-              currentPlan={currentPlan}
-              onUpgrade={handleUpgrade}
-              isLoading={isUpgrading}
-            />
-          ))}
+    <>
+      <div className="container mx-auto py-8 space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold">Billing</h1>
+          <p className="text-muted-foreground">Manage your subscription and usage</p>
         </div>
-      </div>
 
-      {/* Billing Management */}
-      {profile.stripe_customer_id && (
         <Card>
           <CardHeader>
-            <CardTitle>Billing Management</CardTitle>
-            <CardDescription>Manage your active subscription, payment methods, and invoices in Stripe.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              Current Plan
+              <Badge variant={currentPlan ? "default" : "secondary"}>
+                {currentPlan ? currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) : "No Active Plan"}
+              </Badge>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Button variant="outline" onClick={handleOpenBillingPortal} disabled={isOpeningPortal}>
-              Manage Billing (Stripe Portal)
-            </Button>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium">Status</p>
+                <p className="text-sm text-muted-foreground capitalize">{profile.active_subscription_status || "inactive"}</p>
+              </div>
+              {profile.subscription_current_period_end ? (
+                <div>
+                  <p className="text-sm font-medium">Renews</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(profile.subscription_current_period_end).toLocaleDateString()}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <Separator />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-medium">Battle Access</p>
+                <p className="text-sm text-muted-foreground">{planLimits.battlesPerMonth}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium">API Access</p>
+                <p className="text-sm text-muted-foreground">{planLimits.apiCallsPerMonth}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      )}
-    </div>
+
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Upgrade Your Plan</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {(["spectator", "pro", "premium"] as const).map((planType) => (
+              <SubscriptionCard
+                key={planType}
+                plan={planType}
+                currentPlan={currentPlan}
+                onUpgrade={handleUpgrade}
+                isLoading={isUpgrading}
+              />
+            ))}
+          </div>
+        </div>
+
+        {profile.stripe_customer_id ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Billing Management</CardTitle>
+              <CardDescription>Manage your active subscription, payment methods, and invoices in Stripe.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" onClick={handleOpenBillingPortal} disabled={isOpeningPortal}>
+                Manage Billing (Stripe Portal)
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+      </div>
+
+      <StripeCheckoutDialog
+        open={checkoutOpen}
+        title={`${checkoutPlanLabel} Subscription`}
+        description={`Confirm your ${checkoutPlanLabel.toLowerCase()} plan payment in Stripe.`}
+        clientSecret={checkoutClientSecret}
+        publishableKey={publishableKey}
+        confirmLabel="Confirm subscription"
+        onOpenChange={(open) => {
+          if (!open) {
+            resetCheckout();
+          }
+        }}
+        onConfirmed={async () => {
+          await loadProfile();
+          toast.success(`${checkoutPlanLabel} subscription confirmed.`);
+          resetCheckout();
+        }}
+      />
+    </>
   );
 }
