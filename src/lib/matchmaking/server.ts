@@ -109,6 +109,42 @@ async function createHumanBattle(adminClient: AdminClient, userA: string, userB:
   return battle.id as string;
 }
 
+async function claimQueueEntry(
+  adminClient: AdminClient,
+  queueId: string | null | undefined,
+  expectedUserId: string,
+) {
+  if (!queueId) return false;
+
+  const { data, error } = await adminClient
+    .from("matchmaking_queue")
+    .update({ status: "matching" })
+    .eq("id", queueId)
+    .eq("user_id", expectedUserId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`queue_claim_failed:${error.message}`);
+  }
+
+  return Boolean(data?.id);
+}
+
+async function releaseQueueClaim(
+  adminClient: AdminClient,
+  queueId: string | null | undefined,
+) {
+  if (!queueId) return;
+
+  await adminClient
+    .from("matchmaking_queue")
+    .update({ status: "active" })
+    .eq("id", queueId)
+    .eq("status", "matching");
+}
+
 async function createBotBattle(adminClient: AdminClient, userId: string, queueType: QueueMode, battleFormat: string, waitedMs: number) {
   const { data: profile } = await adminClient
     .from("users")
@@ -246,6 +282,20 @@ export async function runMatchmakingStep(params: {
     } satisfies MatchmakingResponse;
   }
 
+  if (existing?.status === "matching") {
+    return {
+      ok: true,
+      mode: queueType,
+      status: "queued",
+      matched: false,
+      battleId: null,
+      isBotBattle: false,
+      fallbackReason: "none",
+      waitTimeMs: elapsedMs(existing.created_at),
+      queueType,
+    } satisfies MatchmakingResponse;
+  }
+
   if (!existing || existing.status !== "active") {
     if (!createIfMissing) {
       return {
@@ -304,7 +354,47 @@ export async function runMatchmakingStep(params: {
     .maybeSingle();
 
   if (opponent?.user_id) {
-    const battleId = await createHumanBattle(adminClient, userId, opponent.user_id, queueType, battleFormat);
+    const selfClaimed = await claimQueueEntry(adminClient, selfQueue?.id, userId);
+    if (!selfClaimed) {
+      return {
+        ok: true,
+        mode: queueType,
+        status: "queued",
+        matched: false,
+        battleId: null,
+        isBotBattle: false,
+        fallbackReason: "none",
+        waitTimeMs: waitedMs,
+        queueType,
+      } satisfies MatchmakingResponse;
+    }
+
+    const opponentClaimed = await claimQueueEntry(adminClient, opponent.id, opponent.user_id);
+    if (!opponentClaimed) {
+      await releaseQueueClaim(adminClient, selfQueue?.id);
+      return {
+        ok: true,
+        mode: queueType,
+        status: "queued",
+        matched: false,
+        battleId: null,
+        isBotBattle: false,
+        fallbackReason: "none",
+        waitTimeMs: waitedMs,
+        queueType,
+      } satisfies MatchmakingResponse;
+    }
+
+    let battleId: string;
+    try {
+      battleId = await createHumanBattle(adminClient, userId, opponent.user_id, queueType, battleFormat);
+    } catch (error) {
+      await Promise.all([
+        releaseQueueClaim(adminClient, selfQueue?.id),
+        releaseQueueClaim(adminClient, opponent.id),
+      ]);
+      throw error;
+    }
 
     await adminClient
       .from("matchmaking_queue")
@@ -325,14 +415,35 @@ export async function runMatchmakingStep(params: {
   }
 
   if (waitedMs >= timeoutMs) {
-    const bot = await createBotBattle(adminClient, userId, queueType, battleFormat, waitedMs);
+    const selfClaimed = await claimQueueEntry(adminClient, selfQueue?.id, userId);
+    if (!selfClaimed) {
+      return {
+        ok: true,
+        mode: queueType,
+        status: "queued",
+        matched: false,
+        battleId: null,
+        isBotBattle: false,
+        fallbackReason: "none",
+        waitTimeMs: waitedMs,
+        queueType,
+      } satisfies MatchmakingResponse;
+    }
+
+    let bot;
+    try {
+      bot = await createBotBattle(adminClient, userId, queueType, battleFormat, waitedMs);
+    } catch (error) {
+      await releaseQueueClaim(adminClient, selfQueue?.id);
+      throw error;
+    }
 
     await adminClient
       .from("matchmaking_queue")
       .update({ status: "matched", battle_id: bot.battleId })
       .eq("user_id", userId)
       .eq("queue_type", queueType)
-      .eq("status", "active");
+      .eq("status", "matching");
 
     return {
       ok: true,

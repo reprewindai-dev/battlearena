@@ -47,6 +47,9 @@ export async function GET(request: NextRequest) {
   if (!battle) {
     return NextResponse.json({ error: "battle_not_found" }, { status: 404 });
   }
+  if (battle.status === "complete" || battle.status === "canceled") {
+    return NextResponse.json({ error: "battle_not_joinable" }, { status: 409 });
+  }
 
   const { data: participantRow } = await supabase
     .from("battle_participants")
@@ -56,6 +59,9 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   const viewerRole = getRole({ isParticipant: Boolean(participantRow) || battle.created_by === user.id });
+  if (viewerRole === "spectator") {
+    return NextResponse.json({ error: "not_participant" }, { status: 403 });
+  }
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -83,8 +89,8 @@ export async function GET(request: NextRequest) {
       room,
       roomJoin: true,
       canSubscribe: true,
-      canPublish: viewerRole === "participant",
-      canPublishData: viewerRole === "participant",
+      canPublish: true,
+      canPublishData: true,
     });
     const jwt = await token.toJwt();
 

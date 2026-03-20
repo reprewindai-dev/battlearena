@@ -97,11 +97,11 @@ export function RankedQueueCard() {
           </div>
           <div>
             <span className="font-medium">Entry:</span>
-            <p className="text-gray-600">$5.00</p>
+            <p className="text-gray-600">Ranked ladder</p>
           </div>
           <div>
             <span className="font-medium">Prize:</span>
-            <p className="text-gray-600">$10.00</p>
+            <p className="text-gray-600">MMR and tier progress</p>
           </div>
           <div>
             <span className="font-medium">Bot fallback:</span>
