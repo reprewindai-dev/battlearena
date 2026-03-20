@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 export async function POST(
@@ -11,6 +12,7 @@ export async function POST(
   if (!supabase) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   }
+  const adminClient = createSupabaseServiceRoleClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
@@ -66,29 +68,39 @@ export async function POST(
 
   // Deduct entry fee if applicable
   if (tournament.entry_fee_tokens > 0) {
-    const { data: wallet } = await supabase
-      .from("wallets")
-      .select("crowns_balance")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { data: spendResult, error: spendError } = await adminClient.rpc("spend_user_token_balance", {
+      p_user_id: user.id,
+      p_amount: tournament.entry_fee_tokens,
+    });
 
-    const balance = wallet?.crowns_balance ?? 0;
-    if (balance < tournament.entry_fee_tokens) {
-      return NextResponse.json({ error: "Insufficient tokens" }, { status: 400 });
+    if (spendError) {
+      return NextResponse.json({ error: spendError.message }, { status: 500 });
     }
 
-    const { error: walletError } = await supabase
-      .from("wallets")
-      .upsert(
-        { user_id: user.id, crowns_balance: balance - tournament.entry_fee_tokens },
-        { onConflict: "user_id" },
+    const typedSpendResult = (spendResult ?? {}) as {
+      ok?: boolean;
+      error?: string;
+      current_balance?: number;
+      new_balance?: number;
+    };
+
+    if (!typedSpendResult.ok) {
+      if (typedSpendResult.error === "insufficient_balance") {
+        return NextResponse.json(
+          {
+            error: "Insufficient tokens",
+            current_balance: typedSpendResult.current_balance ?? 0,
+          },
+          { status: 400 },
+        );
+      }
+      return NextResponse.json(
+        { error: typedSpendResult.error ?? "token_spend_failed" },
+        { status: 409 },
       );
-
-    if (walletError) {
-      return NextResponse.json({ error: walletError.message }, { status: 500 });
     }
 
-    const { error: txError } = await supabase.from("token_transactions").insert({
+    const { error: txError } = await adminClient.from("token_transactions").insert({
       user_id: user.id,
       recipient_id: tournament.created_by,
       tokens_spent: tournament.entry_fee_tokens,
@@ -99,6 +111,10 @@ export async function POST(
     });
 
     if (txError) {
+      await adminClient.rpc("increment_user_token_balance", {
+        p_user_id: user.id,
+        p_delta: tournament.entry_fee_tokens,
+      });
       return NextResponse.json({ error: txError.message }, { status: 500 });
     }
   }
@@ -112,23 +128,12 @@ export async function POST(
   if (error) {
     if (error.code === "23505") {
       if (tournament.entry_fee_tokens > 0) {
-        const { data: latestWallet } = await supabase
-          .from("wallets")
-          .select("crowns_balance")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        await adminClient.rpc("increment_user_token_balance", {
+          p_user_id: user.id,
+          p_delta: tournament.entry_fee_tokens,
+        });
 
-        await supabase
-          .from("wallets")
-          .upsert(
-            {
-              user_id: user.id,
-              crowns_balance: (latestWallet?.crowns_balance ?? 0) + tournament.entry_fee_tokens,
-            },
-            { onConflict: "user_id" },
-          );
-
-        await supabase
+        await adminClient
           .from("token_transactions")
           .delete()
           .eq("user_id", user.id)
