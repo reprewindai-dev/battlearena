@@ -1,0 +1,121 @@
+# Launch Gate
+
+## Scope
+This gate tracks the production launch state of the Battle Arena web runtime deployed from the repository root at `C:\Users\antho\.windsurf\battlearena\battlearena`.
+
+Canonical runtime decisions:
+- Live battle runtime: `/app/battles/room`
+- Billing APIs: `/api/subscriptions/create`, `/api/subscriptions/portal`, `/api/economy/tokens/purchase`, `/api/economy/tokens/confirm`, `/api/stripe/webhook`
+- Token spend source: `user_profiles.token_balance`
+- Deployment target: Render web service `battlearena-web`
+
+## Required Runtime Environment
+Required in production:
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_SITE_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXT_PUBLIC_LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
+- `STRIPE_SECRET_KEY`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_BILLING_WEBHOOK_SECRET`
+- `STRIPE_PRICE_SUB_SPECTATOR_MONTHLY`
+- `STRIPE_PRICE_SUB_PRO_MONTHLY`
+- `STRIPE_PRICE_SUB_PREMIUM_MONTHLY`
+- `BEATS_STORAGE_BUCKET`
+- `SERVER_SIGNATURE_SECRET`
+- `CRON_CLEANUP_SECRET`
+
+Governance controls:
+- `GOV_ENABLED=true`
+- `GOV_TRACE_ONLY=false`
+- `GOV_ENFORCE_BLOCKS=true`
+
+## Required Database State
+Required migrations and database contracts:
+- Supabase migrations under `supabase/migrations`
+- RPCs used by runtime flows must exist:
+  - `increment_user_token_balance`
+  - `spend_user_token_balance`
+- Required tables/views used by current runtime:
+  - `users`
+  - `user_profiles`
+  - `user_billing_profiles`
+  - `payment_ledger`
+  - `battles`
+  - `battle_participants`
+  - `matchmaking_queue`
+  - `tournaments`
+  - `tournament_registrations`
+  - `moderation_cases`
+  - `notifications`
+  - `player_stats`
+  - `user_achievements`
+
+## Verified Checks
+Static verification completed on the current codebase:
+- `npm run typecheck`
+- `npm run lint`
+- `NODE_OPTIONS=--max-old-space-size=1024 npm run build`
+
+Recent runtime verification completed:
+- Render production health endpoint returns `ok`
+- Render production commit is live on `8bee2939bae7d8e0dd75ad27e1dfee41a392d887`
+- Health response currently reports dependencies healthy:
+  - `supabase: true`
+  - `livekit: true`
+  - `stripe: true`
+- Production token shop uses a real Stripe Payment Element flow
+- Production billing page uses a real Stripe Payment Element flow for incomplete subscription payments
+- Battle runtime routes are normalized:
+  - `/app/battles/room` is the runtime
+  - `/app/battles/pvp` redirects to room
+  - `/app/battles/bot-room/[battleId]` redirects to room with `battleId`
+
+Recent workflow hardening already landed:
+- CodeQL uses `github/codeql-action@v3`
+- workflow path filters target this repo structure
+- Render deployment health route exists at `/api/health`
+
+## Blocked Or Not Yet Fully Proven
+These items are not signed off yet:
+- full two-user live battle verification against production LiveKit from automated E2E
+- timed bot fallback verification against production with audited battle metadata
+- full Stripe webhook-to-profile reconciliation verification in production after live payment events
+- tournament registration debit and refund verification against production balances
+- production beat ingestion verification from storage-backed uploads through front-end playback
+- Docker Scout image scan rerun after local Docker service stability is restored
+- GitHub Actions green run confirmation on the latest workflow + app commits
+
+## Current Risks
+Open launch risks that must be cleared before calling the build 100 percent complete:
+- runtime verification still depends on real provider credentials and a stable browser automation environment
+- billing and token flows now require `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to be present in Render; blueprint config was updated, but the Render service must also have the value set
+- local Docker instability has blocked repeatable LiveKit container verification on this machine
+- several older status documents in the repo overstate completion and should not be treated as proof of launch readiness
+
+## Release Gate Status
+Current gate: `YELLOW`
+
+Meaning:
+- code compiles, builds, deploys, and serves production traffic
+- critical checkout/runtime defects have been removed
+- production is not yet signed off for 100 percent completion because the blocked runtime proofs above are still open
+
+## Exit Criteria For Green
+The gate turns green only when all of the following are complete:
+- latest GitHub Actions CI and security workflows pass on current `main`
+- production Render environment includes all required vars, including `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- real two-user battle flow is verified end to end
+- timed bot fallback is verified end to end for casual and ranked paths
+- live payment purchase and subscription payment are verified through webhook reconciliation
+- tournament token debit/refund path is verified against canonical profile balance
+- storage-backed beat upload and playback are verified in production
+- no remaining high-severity launch blockers are open

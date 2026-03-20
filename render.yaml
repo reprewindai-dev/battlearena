@@ -2,6 +2,7 @@ services:
   - type: web
     name: battlearena-web
     runtime: docker
+    repo: https://github.com/reprewindai-dev/battlearena
     plan: free
     branch: main
     autoDeploy: true
@@ -40,6 +41,8 @@ services:
       - key: SERVER_SIGNATURE_SECRET
         sync: false
       - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
