@@ -44,6 +44,9 @@ Required migrations and database contracts:
 - RPCs used by runtime flows must exist:
   - `increment_user_token_balance`
   - `spend_user_token_balance`
+  - `finalize_token_purchase_ledger`
+  - `record_battle_result`
+  - `apply_battle_elo_ratings`
 - Required tables/views used by current runtime:
   - `users`
   - `user_profiles`
@@ -67,22 +70,29 @@ Static verification completed on the current codebase:
 
 Recent runtime verification completed:
 - Render production health endpoint returns `ok`
-- Render production commit is live on `8bee2939bae7d8e0dd75ad27e1dfee41a392d887`
+- Render production commit is live on `4c56613de3184b7a4940ab9bf86709d6d076336f`
 - Health response currently reports dependencies healthy:
   - `supabase: true`
   - `livekit: true`
   - `stripe: true`
 - Production token shop uses a real Stripe Payment Element flow
 - Production billing page uses a real Stripe Payment Element flow for incomplete subscription payments
+- Production webhook route accepts either payment or billing webhook signatures
 - Battle runtime routes are normalized:
   - `/app/battles/room` is the runtime
   - `/app/battles/pvp` redirects to room
   - `/app/battles/bot-room/[battleId]` redirects to room with `battleId`
+- Matched battles promote to `live` on room join instead of remaining stuck in `matched`
+- Live Render smoke suite passes unauthenticated paths against production:
+  - `4 passed`
+  - `4 skipped`
 
-Recent workflow hardening already landed:
-- CodeQL uses `github/codeql-action@v3`
-- workflow path filters target this repo structure
-- Render deployment health route exists at `/api/health`
+Recent workflow hardening completed:
+- `Battle Arena CI` passes on current `main`
+- `Battle Arena E2E` passes on current `main`
+- `Cleanup stale battle recordings` passes on current `main`
+- `CodeQL` passes on current `main`
+- manual Render smoke action exists at `.github/workflows/render-live-smoke.yml`
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
@@ -92,12 +102,12 @@ These items are not signed off yet:
 - tournament registration debit and refund verification against production balances
 - production beat ingestion verification from storage-backed uploads through front-end playback
 - Docker Scout image scan rerun after local Docker service stability is restored
-- GitHub Actions green run confirmation on the latest workflow + app commits
+- direct confirmation that Render has `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` set in the live service env
 
 ## Current Risks
 Open launch risks that must be cleared before calling the build 100 percent complete:
 - runtime verification still depends on real provider credentials and a stable browser automation environment
-- billing and token flows now require `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to be present in Render; blueprint config was updated, but the Render service must also have the value set
+- authenticated smoke and matchmaking verification require real GitHub Actions or local test credentials
 - local Docker instability has blocked repeatable LiveKit container verification on this machine
 - several older status documents in the repo overstate completion and should not be treated as proof of launch readiness
 
@@ -106,6 +116,7 @@ Current gate: `YELLOW`
 
 Meaning:
 - code compiles, builds, deploys, and serves production traffic
+- workflow health is green on the current repo baseline
 - critical checkout/runtime defects have been removed
 - production is not yet signed off for 100 percent completion because the blocked runtime proofs above are still open
 
