@@ -24,6 +24,7 @@ on:
       - ".github/workflows/codeql.yml"
   schedule:
     - cron: "31 3 * * 1"
+  workflow_dispatch:
 
 jobs:
   analyze:
@@ -35,20 +36,31 @@ jobs:
       contents: read
       security-events: write
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ["javascript-typescript"]
-
     steps:
+      - name: Check CodeQL availability
+        id: availability
+        run: |
+          if [ "${{ github.event.repository.private }}" = "true" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.availability.outputs.enabled == 'true'
         uses: actions/checkout@v4
 
       - name: Initialize CodeQL
+        if: steps.availability.outputs.enabled == 'true'
         uses: github/codeql-action/init@v3
         with:
-          languages: ${{ matrix.language }}
+          languages: javascript-typescript
           build-mode: none
 
       - name: Perform CodeQL Analysis
+        if: steps.availability.outputs.enabled == 'true'
         uses: github/codeql-action/analyze@v3
+
+      - name: Skip CodeQL when unavailable for this repository
+        if: steps.availability.outputs.enabled != 'true'
+        run: echo "CodeQL skipped because this private repository is not configured for GitHub Advanced Security."
