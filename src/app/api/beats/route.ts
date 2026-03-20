@@ -2,8 +2,9 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getSessionUser } from "@/lib/auth/session";
+import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 const SORTABLE_FIELDS = new Set(["usage_count", "created_at", "tempo", "title"]);
 
@@ -122,6 +123,10 @@ export async function POST(req: Request) {
     if (!user) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    const role = await getSessionRole();
+    if (role !== "admin" && role !== "mod") {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
 
     const formData = await req.formData();
     const beatDataRaw = formData.get("beatData");
@@ -153,6 +158,7 @@ export async function POST(req: Request) {
     }
 
     const adminClient = createSupabaseServiceRoleClient();
+    await ensurePublicUserRecord(adminClient, user);
     const bucket = process.env.BEATS_STORAGE_BUCKET ?? "beats";
 
     const fileStem = `${Date.now()}-${randomUUID().slice(0, 8)}-${sanitizePathPart(metadataParse.data.title)}`;
