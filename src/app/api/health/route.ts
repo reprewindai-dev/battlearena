@@ -10,11 +10,16 @@ export async function GET() {
   const supabasePublicKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+  const supabaseServiceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY;
   const stripeWebhookSecret =
     process.env.STRIPE_WEBHOOK_SECRET ?? process.env.STRIPE_BILLING_WEBHOOK_SECRET;
 
   const checks = {
-    supabase: isConfigured(process.env.NEXT_PUBLIC_SUPABASE_URL) && isConfigured(supabasePublicKey),
+    supabase:
+      isConfigured(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+      isConfigured(supabasePublicKey) &&
+      isConfigured(supabaseServiceKey),
     livekit:
       isConfigured(process.env.NEXT_PUBLIC_LIVEKIT_URL) &&
       isConfigured(process.env.LIVEKIT_API_KEY) &&
