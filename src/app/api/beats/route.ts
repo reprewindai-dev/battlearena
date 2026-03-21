@@ -2,11 +2,18 @@ import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  buildFallbackArtworkSvg,
+  inferBeatFlags,
+  inferMoodTags,
+  parseAudioDurationSeconds,
+  slugifyBeat,
+} from "@/lib/beats/catalog";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
-const SORTABLE_FIELDS = new Set(["usage_count", "created_at", "tempo", "title"]);
+const SORTABLE_FIELDS = new Set(["usage_count", "created_at", "tempo", "bpm", "title"]);
 
 const BeatMetadataSchema = z.object({
   title: z.string().min(1).max(255),
@@ -17,6 +24,9 @@ const BeatMetadataSchema = z.object({
   duration_seconds: z.number().int().min(5).max(1800).optional().nullable(),
   license_type: z.string().max(50).optional().nullable(),
   tags: z.array(z.string().max(40)).max(20).optional(),
+  featured: z.boolean().optional(),
+  homepage_safe: z.boolean().optional(),
+  tournament_safe: z.boolean().optional(),
 });
 
 function sanitizePathPart(value: string) {
@@ -44,6 +54,9 @@ export async function GET(req: Request) {
     const sortByRaw = url.searchParams.get("sort_by") ?? "usage_count";
     const sortBy = SORTABLE_FIELDS.has(sortByRaw) ? sortByRaw : "usage_count";
     const sortOrder = url.searchParams.get("sort_order") === "asc" ? "asc" : "desc";
+    const featuredOnly = url.searchParams.get("featured") === "true";
+    const homepageSafeOnly = url.searchParams.get("homepage_safe") === "true";
+    const tournamentSafeOnly = url.searchParams.get("tournament_safe") === "true";
 
     let adminClient;
     try {
@@ -64,27 +77,47 @@ export async function GET(req: Request) {
           limit,
           sortBy,
           sortOrder,
+          featuredOnly,
+          homepageSafeOnly,
+          tournamentSafeOnly,
         },
       });
     }
 
     let query = adminClient
       .from("beats")
-      .select("id,title,artist,tempo,key_signature,genre,duration_seconds,preview_url,file_url,license_type,usage_count,created_at")
-      .eq("is_active", true);
+      .select(
+        "id,title,artist,producer_name,slug,tempo,bpm,key_signature,musical_key,genre,mood_tags,duration_seconds,preview_url,file_url,audio_storage_path,preview_storage_path,artwork_url,license_type,usage_count,is_featured,is_homepage_safe,is_tournament_safe,waveform_status,created_at",
+      )
+      .eq("is_active", true)
+      .eq("is_verified", true)
+      .eq("status", "active")
+      .not("file_url", "is", null)
+      .not("preview_url", "is", null)
+      .not("artwork_url", "is", null)
+      .gt("duration_seconds", 0);
 
     if (genre && genre !== "all") {
       query = query.eq("genre", genre);
     }
+    if (featuredOnly) {
+      query = query.eq("is_featured", true);
+    }
+    if (homepageSafeOnly) {
+      query = query.eq("is_homepage_safe", true);
+    }
+    if (tournamentSafeOnly) {
+      query = query.eq("is_tournament_safe", true);
+    }
 
     if (Number.isFinite(tempoMin)) {
-      query = query.gte("tempo", Math.max(0, tempoMin));
+      query = query.gte("bpm", Math.max(0, tempoMin));
     }
     if (Number.isFinite(tempoMax)) {
-      query = query.lte("tempo", Math.max(0, tempoMax));
+      query = query.lte("bpm", Math.max(0, tempoMax));
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === "asc" }).limit(limit);
+    query = query.order(sortBy === "tempo" ? "bpm" : sortBy, { ascending: sortOrder === "asc" }).limit(limit);
 
     const { data, error } = await query;
 
@@ -104,6 +137,9 @@ export async function GET(req: Request) {
         limit,
         sortBy,
         sortOrder,
+        featuredOnly,
+        homepageSafeOnly,
+        tournamentSafeOnly,
       },
     });
   } catch (error) {
@@ -161,12 +197,16 @@ export async function POST(req: Request) {
     await ensurePublicUserRecord(adminClient, user);
     const bucket = process.env.BEATS_STORAGE_BUCKET ?? "beats";
 
-    const fileStem = `${Date.now()}-${randomUUID().slice(0, 8)}-${sanitizePathPart(metadataParse.data.title)}`;
+    const payload = metadataParse.data;
+    const slug = slugifyBeat(`${payload.title}-${randomUUID().slice(0, 8)}`);
+    const fileStem = `${Date.now()}-${randomUUID().slice(0, 8)}-${sanitizePathPart(payload.title)}`;
     const audioPath = `audio/${user.id}/${fileStem}.${getFileExtension(audioFile.name)}`;
     const previewPath = `preview/${user.id}/${fileStem}.${getFileExtension(previewFile.name)}`;
+    const artworkPath = `artwork/generated/${slug}.svg`;
 
     const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
     const previewBuffer = Buffer.from(await previewFile.arrayBuffer());
+    const inferredDuration = await parseAudioDurationSeconds(audioBuffer, audioFile.type).catch(() => 0);
 
     const audioUpload = await adminClient.storage.from(bucket).upload(audioPath, audioBuffer, {
       contentType: audioFile.type,
@@ -185,30 +225,61 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "preview_upload_failed", details: previewUpload.error.message }, { status: 500 });
     }
 
+    const artworkSvg = buildFallbackArtworkSvg({
+      title: payload.title,
+      producerName: payload.artist,
+      bpm: payload.tempo,
+      genre: payload.genre,
+    });
+    const artworkUpload = await adminClient.storage.from(bucket).upload(artworkPath, Buffer.from(artworkSvg, "utf8"), {
+      contentType: "image/svg+xml",
+      upsert: true,
+    });
+    if (artworkUpload.error) {
+      await adminClient.storage.from(bucket).remove([audioPath, previewPath]);
+      return NextResponse.json({ error: "artwork_upload_failed", details: artworkUpload.error.message }, { status: 500 });
+    }
+
     const audioPublic = adminClient.storage.from(bucket).getPublicUrl(audioPath).data.publicUrl;
     const previewPublic = adminClient.storage.from(bucket).getPublicUrl(previewPath).data.publicUrl;
+    const artworkPublic = adminClient.storage.from(bucket).getPublicUrl(artworkPath).data.publicUrl;
+    const flags = inferBeatFlags({ bpm: payload.tempo, genre: payload.genre, usage_count: 0 });
 
-    const payload = metadataParse.data;
     const { data: inserted, error: insertError } = await adminClient
       .from("beats")
       .insert({
         title: payload.title,
         artist: payload.artist,
+        producer_name: payload.artist,
+        slug,
         tempo: payload.tempo,
+        bpm: payload.tempo,
         key_signature: payload.key_signature ?? null,
+        musical_key: payload.key_signature ?? null,
         genre: payload.genre,
-        duration_seconds: payload.duration_seconds ?? null,
+        mood_tags: payload.tags?.length ? payload.tags : inferMoodTags({ genre: payload.genre, title: payload.title }),
+        duration_seconds: payload.duration_seconds ?? inferredDuration ?? null,
         file_url: audioPublic,
         preview_url: previewPublic,
+        audio_storage_path: audioPath,
+        preview_storage_path: previewPath,
+        artwork_url: artworkPublic,
+        artwork_storage_path: artworkPath,
         license_type: payload.license_type ?? "standard",
+        waveform_status: "placeholder_generated",
         uploaded_by: user.id,
         is_active: true,
+        is_verified: true,
+        status: "active",
+        is_featured: payload.featured ?? flags.is_featured,
+        is_homepage_safe: payload.homepage_safe ?? flags.is_homepage_safe,
+        is_tournament_safe: payload.tournament_safe ?? flags.is_tournament_safe,
       })
-      .select("id,title,artist,tempo,key_signature,genre,duration_seconds,preview_url,file_url,license_type,usage_count,created_at")
+      .select("id,title,artist,producer_name,slug,tempo,bpm,key_signature,musical_key,genre,mood_tags,duration_seconds,preview_url,file_url,audio_storage_path,preview_storage_path,artwork_url,license_type,usage_count,is_featured,is_homepage_safe,is_tournament_safe,waveform_status,created_at")
       .single();
 
     if (insertError) {
-      await adminClient.storage.from(bucket).remove([audioPath, previewPath]);
+      await adminClient.storage.from(bucket).remove([audioPath, previewPath, artworkPath]);
       return NextResponse.json({ error: "beat_insert_failed", details: insertError.message }, { status: 500 });
     }
 

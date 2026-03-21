@@ -1,0 +1,22 @@
+{
+  "beats": [
+    {
+      "id": "launch-001",
+      "title": "Run Em Up",
+      "slug": "run-em-up",
+      "producer_name": "Prod.WizardOfAus",
+      "artist": "Prod.WizardOfAus",
+      "bpm": 140,
+      "key": "A minor",
+      "genre": "hip-hop",
+      "mood_tags": ["battle", "hype", "aggressive"],
+      "audio_path": "../../tmp/local_beats/MASSIVE BEAT PACK 2025/Run Em Up - Hiphop - Prod.WizardOfAus.wav",
+      "preview_path": "../../tmp/local_beats/MASSIVE BEAT PACK 2025/Run Em Up - Hiphop - Prod.WizardOfAus.wav",
+      "license_type": "provided_pack",
+      "source": "launch_manifest",
+      "is_featured": true,
+      "is_homepage_safe": true,
+      "is_tournament_safe": true
+    }
+  ]
+}

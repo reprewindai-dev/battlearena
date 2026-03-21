@@ -477,7 +477,16 @@ export function BattleRoomCockpit() {
       setBeatLoadError(null);
 
       try {
-        const res = await fetch("/api/beats?limit=40&sort_by=usage_count&sort_order=desc");
+        const params = new URLSearchParams({
+          limit: "40",
+          sort_by: "usage_count",
+          sort_order: "desc",
+        });
+        if (sessionMeta?.battle_type === "tournament") {
+          params.set("tournament_safe", "true");
+        }
+
+        const res = await fetch(`/api/beats?${params.toString()}`);
         const body = (await res.json()) as
           | { ok: true; beats: Beat[] }
           | { error: string; details?: string };

@@ -82,7 +82,7 @@ const PremiumMobileHomePage: React.FC = () => {
     async function loadHomeData() {
       const [battlesRes, beatsRes, leaderboardRes] = await Promise.all([
         fetch('/api/battles?limit=6'),
-        fetch('/api/beats?limit=8&sort_by=usage_count&sort_order=desc'),
+        fetch('/api/beats?limit=8&sort_by=usage_count&sort_order=desc&featured=true&homepage_safe=true'),
         fetch('/api/community/leaderboard?limit=3'),
       ]);
 

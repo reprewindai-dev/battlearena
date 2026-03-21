@@ -1,7 +1,13 @@
-import { randomUUID } from "crypto";
-
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+
+import {
+  buildFallbackArtworkSvg,
+  inferBeatFlags,
+  inferMoodTags,
+  parseAudioDurationSeconds,
+  slugifyBeat,
+} from "@/lib/beats/catalog";
 
 export const RemoteBeatTrackSchema = z.object({
   title: z.string().trim().min(1).max(255),
@@ -93,15 +99,19 @@ export async function ingestRemoteBeatCatalog(params: {
   await ensureBucket(adminClient, bucket);
 
   const results: Array<Record<string, unknown>> = [];
+  type ExistingBeat = { id: string; slug: string | null; title: string; artist: string };
 
   for (const track of tracks) {
-    const { data: existing } = await adminClient
+    const producerName = track.artist;
+    const bpm = track.tempo;
+    const slugBase = slugifyBeat(`${track.title}-${producerName}`);
+
+    const { data: existingData } = await adminClient
       .from("beats")
-      .select("id,title,artist")
-      .eq("source", track.source)
-      .eq("title", track.title)
-      .eq("artist", track.artist)
+      .select("id,slug,title,artist")
+      .eq("slug", slugBase)
       .maybeSingle();
+    const existing = (existingData ?? null) as ExistingBeat | null;
 
     if (existing) {
       results.push({ status: "skipped", reason: "duplicate", beat: existing });
@@ -113,15 +123,17 @@ export async function ingestRemoteBeatCatalog(params: {
       ? await downloadRemoteAudio(track.preview_url, 10 * 1024 * 1024)
       : audioAsset;
 
-    const stem = `${Date.now()}-${randomUUID().slice(0, 8)}-${sanitizePathPart(track.title)}`;
-    const audioPath = `catalog/audio/${actorUserId}/${stem}.${getFileExtension(track.audio_url, audioAsset.contentType)}`;
+    const producerSlug = sanitizePathPart(producerName);
+    const slug = slugBase;
+    const audioPath = `catalog/audio/${producerSlug}/${slug}/main.${getFileExtension(track.audio_url, audioAsset.contentType)}`;
     const previewPath = track.preview_url
-      ? `catalog/preview/${actorUserId}/${stem}.${getFileExtension(track.preview_url, previewAsset.contentType)}`
+      ? `catalog/preview/${producerSlug}/${slug}/preview.${getFileExtension(track.preview_url, previewAsset.contentType)}`
       : audioPath;
+    const artworkPath = `catalog/artwork/${producerSlug}/${slug}/cover.svg`;
 
     const { error: audioUploadError } = await adminClient.storage.from(bucket).upload(audioPath, audioAsset.buffer, {
       contentType: audioAsset.contentType,
-      upsert: false,
+      upsert: true,
     });
     if (audioUploadError) {
       throw new Error(`beat_audio_upload_failed:${audioUploadError.message}`);
@@ -130,7 +142,7 @@ export async function ingestRemoteBeatCatalog(params: {
     if (previewPath !== audioPath) {
       const { error: previewUploadError } = await adminClient.storage.from(bucket).upload(previewPath, previewAsset.buffer, {
         contentType: previewAsset.contentType,
-        upsert: false,
+        upsert: true,
       });
       if (previewUploadError) {
         await adminClient.storage.from(bucket).remove([audioPath]);
@@ -140,30 +152,68 @@ export async function ingestRemoteBeatCatalog(params: {
 
     const fileUrl = adminClient.storage.from(bucket).getPublicUrl(audioPath).data.publicUrl;
     const previewUrl = adminClient.storage.from(bucket).getPublicUrl(previewPath).data.publicUrl;
+    const durationSeconds =
+      track.duration_seconds ?? ((await parseAudioDurationSeconds(audioAsset.buffer, audioAsset.contentType).catch(() => 0)) || null);
+    const artworkSvg = buildFallbackArtworkSvg({
+      title: track.title,
+      producerName,
+      bpm,
+      genre: track.genre,
+    });
+
+    const { error: artworkUploadError } = await adminClient.storage.from(bucket).upload(artworkPath, Buffer.from(artworkSvg, "utf8"), {
+      contentType: "image/svg+xml",
+      upsert: true,
+    });
+    if (artworkUploadError) {
+      const pathsToRemove = previewPath === audioPath ? [audioPath] : [audioPath, previewPath];
+      await adminClient.storage.from(bucket).remove(pathsToRemove);
+      throw new Error(`beat_artwork_upload_failed:${artworkUploadError.message}`);
+    }
+
+    const artworkUrl = adminClient.storage.from(bucket).getPublicUrl(artworkPath).data.publicUrl;
+    const flags = inferBeatFlags({
+      bpm,
+      genre: track.genre,
+      usage_count: 0,
+    });
 
     const { data: inserted, error: insertError } = await adminClient
       .from("beats")
       .insert({
         title: track.title,
         artist: track.artist,
+        producer_name: producerName,
+        slug,
         genre: track.genre,
         tempo: track.tempo,
+        bpm,
         key_signature: track.key_signature ?? null,
-        duration_seconds: track.duration_seconds ?? null,
+        musical_key: track.key_signature ?? null,
+        mood_tags: inferMoodTags({ genre: track.genre, title: track.title }),
+        duration_seconds: durationSeconds,
+        artwork_url: artworkUrl,
+        artwork_storage_path: artworkPath,
         file_url: fileUrl,
         preview_url: previewUrl,
+        audio_storage_path: audioPath,
+        preview_storage_path: previewPath,
         license_type: track.license_type,
         source: track.source,
+        waveform_status: durationSeconds ? "placeholder_generated" : "pending",
         uploaded_by: actorUserId,
         is_verified: true,
         is_active: true,
         status: "active",
+        is_featured: flags.is_featured,
+        is_homepage_safe: flags.is_homepage_safe,
+        is_tournament_safe: flags.is_tournament_safe,
       })
-      .select("id,title,artist,genre,tempo,file_url,preview_url,created_at")
+      .select("id,slug,title,artist,producer_name,genre,tempo,bpm,duration_seconds,artwork_url,file_url,preview_url,created_at")
       .single();
 
     if (insertError) {
-      const pathsToRemove = previewPath === audioPath ? [audioPath] : [audioPath, previewPath];
+      const pathsToRemove = previewPath === audioPath ? [audioPath, artworkPath] : [audioPath, previewPath, artworkPath];
       await adminClient.storage.from(bucket).remove(pathsToRemove);
       throw new Error(`beat_insert_failed:${insertError.message}`);
     }
