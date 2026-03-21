@@ -11,6 +11,7 @@ import {
 } from "@/lib/beats/catalog";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 const SORTABLE_FIELDS = new Set(["usage_count", "created_at", "tempo", "bpm", "title"]);
@@ -58,33 +59,17 @@ export async function GET(req: Request) {
     const homepageSafeOnly = url.searchParams.get("homepage_safe") === "true";
     const tournamentSafeOnly = url.searchParams.get("tournament_safe") === "true";
 
-    let adminClient;
+    let beatsClient;
+    let mode: "supabase" | "supabase_public" = "supabase";
     try {
-      adminClient = createSupabaseServiceRoleClient();
+      beatsClient = createSupabaseServiceRoleClient();
     } catch (error) {
-      console.warn("api/beats: service role unavailable, returning empty beat list", error);
-      return NextResponse.json({
-        ok: true,
-        mode: "supabase",
-        beats: [],
-        total: 0,
-        degraded: true,
-        reason: "supabase_service_role_unavailable",
-        filters: {
-          genre,
-          tempoMin,
-          tempoMax,
-          limit,
-          sortBy,
-          sortOrder,
-          featuredOnly,
-          homepageSafeOnly,
-          tournamentSafeOnly,
-        },
-      });
+      console.warn("api/beats: service role unavailable, falling back to public client", error);
+      beatsClient = createSupabasePublicClient();
+      mode = "supabase_public";
     }
 
-    let query = adminClient
+    let query = beatsClient
       .from("beats")
       .select(
         "id,title,artist,producer_name,slug,tempo,bpm,key_signature,musical_key,genre,mood_tags,duration_seconds,preview_url,file_url,audio_storage_path,preview_storage_path,artwork_url,license_type,usage_count,is_featured,is_homepage_safe,is_tournament_safe,waveform_status,created_at",
@@ -127,7 +112,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      mode: "supabase",
+      mode,
       beats: data ?? [],
       total: data?.length ?? 0,
       filters: {

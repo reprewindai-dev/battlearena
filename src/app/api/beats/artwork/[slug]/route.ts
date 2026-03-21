@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { buildFallbackArtworkSvg } from "@/lib/beats/catalog";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 type RouteContext = {
@@ -14,8 +15,14 @@ export async function GET(_: Request, context: RouteContext) {
     return new NextResponse("missing_slug", { status: 400 });
   }
 
-  const adminClient = createSupabaseServiceRoleClient();
-  const { data, error } = await adminClient
+  let beatsClient;
+  try {
+    beatsClient = createSupabaseServiceRoleClient();
+  } catch {
+    beatsClient = createSupabasePublicClient();
+  }
+
+  const { data, error } = await beatsClient
     .from("beats")
     .select("title,artist,producer_name,bpm,tempo,genre,is_active,is_verified,status")
     .eq("slug", slug)
