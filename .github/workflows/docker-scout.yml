@@ -1,0 +1,43 @@
+name: Docker Scout
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Dockerfile"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/render-start.sh"
+      - ".github/workflows/docker-scout.yml"
+  workflow_dispatch:
+
+jobs:
+  scout:
+    name: Build And Scan Production Image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Docker Scout
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh -o install-scout.sh
+          sh install-scout.sh
+          echo "$HOME/.docker/scout" >> "$GITHUB_PATH"
+
+      - name: Verify Docker Scout
+        run: docker scout version
+
+      - name: Build production image
+        run: docker buildx build --load -t battlearena:ci-scan .
+
+      - name: Scan image for critical and high vulnerabilities
+        run: docker scout cves local://battlearena:ci-scan --only-severity critical,high --exit-code
