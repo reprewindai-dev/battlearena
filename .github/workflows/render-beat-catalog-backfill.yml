@@ -23,13 +23,22 @@ jobs:
           LIMIT: ${{ inputs.limit || '100' }}
         run: |
           if [ -z "$CRON_CLEANUP_SECRET" ]; then
-            echo "CRON_CLEANUP_SECRET is not configured; skipping"
-            exit 0
+            echo "CRON_CLEANUP_SECRET is not configured"
+            exit 1
           fi
 
-          curl --fail --silent --show-error \
+          status_code=$(curl --silent --show-error \
+            --output response.json \
+            --write-out "%{http_code}" \
             -X POST \
             -H "content-type: application/json" \
             -H "x-cron-secret: $CRON_CLEANUP_SECRET" \
             --data "{\"limit\":$LIMIT}" \
-            "$BASE_URL/api/admin/beats/backfill"
+            "$BASE_URL/api/admin/beats/backfill")
+
+          cat response.json
+
+          if [ "$status_code" -lt 200 ] || [ "$status_code" -ge 300 ]; then
+            echo "Beat catalog backfill failed with status $status_code"
+            exit 1
+          fi

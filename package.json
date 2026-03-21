@@ -18,6 +18,7 @@
     "cleanup:stale": "node scripts/cleanup-stale-recordings.mjs",
     "cleanup:stale:watch": "node scripts/cleanup-stale-recordings.mjs",
     "beats:import": "ts-node scripts/import-beats.ts",
+    "beats:normalize:sql": "ts-node scripts/generate-local-beat-normalization-sql.ts",
     "verify": "npm run verify:env && npm run verify:docker && npm run verify:matchmaking && npm run verify:payments && npm run verify:security",
     "verify:env": "ts-node scripts/verify-env.ts",
     "verify:docker": "ts-node scripts/verify-docker.ts",

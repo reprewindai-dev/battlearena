@@ -16,6 +16,10 @@ Database mapping:
 - `preview_storage_path` -> canonical storage-relative preview path
 - `artwork_storage_path` -> canonical storage-relative artwork path
 
+Legacy normalization fallback:
+- if a historical beat row is missing bucket-backed artwork, `artwork_url` may temporarily point to `/api/beats/artwork/<slug>`
+- that fallback is acceptable for launch-safe surfacing, but new imports should still write bucket-backed artwork when available
+
 Launch-safe surface rules:
 - `status = 'active'`
 - `is_active = true`
