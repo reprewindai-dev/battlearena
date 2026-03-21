@@ -1,27 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
+import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const logContext = createRequestLogContext(req, "/api/tournaments/[id]/register", {
+    tournament_id: id,
+  });
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+    logStructured("error", "tournament_register_supabase_unavailable", logContext);
+    return withRequestId(
+      NextResponse.json({ error: "Service unavailable" }, { status: 503 }),
+      logContext.request_id,
+    );
   }
   const adminClient = createSupabaseServiceRoleClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logStructured("warn", "tournament_register_unauthorized", logContext);
+    return withRequestId(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+      logContext.request_id,
+    );
   }
+  logContext.user_id = user.id;
   try {
     await ensurePublicUserRecord(supabase, user);
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 });
+    logStructured("warn", "tournament_register_user_bootstrap_failed", logContext, {
+      error: error instanceof Error ? error.message : "user_bootstrap_failed",
+    });
+    return withRequestId(
+      NextResponse.json({ error: error instanceof Error ? error.message : "user_bootstrap_failed" }, { status: 400 }),
+      logContext.request_id,
+    );
   }
 
   const { data: registrationResult, error: registrationError } = await adminClient.rpc(
@@ -33,7 +53,13 @@ export async function POST(
   );
 
   if (registrationError) {
-    return NextResponse.json({ error: registrationError.message }, { status: 500 });
+    logStructured("error", "tournament_register_rpc_failed", logContext, {
+      error: registrationError.message,
+    });
+    return withRequestId(
+      NextResponse.json({ error: registrationError.message }, { status: 500 }),
+      logContext.request_id,
+    );
   }
 
   const typedRegistrationResult = (registrationResult ?? {}) as {
@@ -54,9 +80,17 @@ export async function POST(
       responseBody.current_balance = typedRegistrationResult.current_balance;
     }
 
-    return NextResponse.json(responseBody, {
-      status: typeof typedRegistrationResult.status_code === "number" ? typedRegistrationResult.status_code : 409,
+    logStructured("warn", "tournament_register_rejected", logContext, {
+      error: typedRegistrationResult.error ?? "tournament_registration_failed",
+      current_balance: typedRegistrationResult.current_balance ?? null,
     });
+
+    return withRequestId(
+      NextResponse.json(responseBody, {
+        status: typeof typedRegistrationResult.status_code === "number" ? typedRegistrationResult.status_code : 409,
+      }),
+      logContext.request_id,
+    );
   }
 
   await supabase.from("activity_feed").insert({
@@ -67,5 +101,23 @@ export async function POST(
     meta: { tournament_name: typedRegistrationResult.tournament_name ?? null },
   });
 
-  return NextResponse.json({ participant: typedRegistrationResult.participant }, { status: 201 });
+  await getTelemetrySystem()
+    .emitEvent({
+      event_type: "TOURNAMENT_REGISTERED",
+      player_id: user.id,
+      event_data: {
+        tournament_id: id,
+        tournament_name: typedRegistrationResult.tournament_name ?? null,
+      },
+    })
+    .catch(() => null);
+
+  logStructured("info", "tournament_registered", logContext, {
+    tournament_name: typedRegistrationResult.tournament_name ?? null,
+  });
+
+  return withRequestId(
+    NextResponse.json({ participant: typedRegistrationResult.participant }, { status: 201 }),
+    logContext.request_id,
+  );
 }

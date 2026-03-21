@@ -16,10 +16,12 @@ export async function GET() {
     process.env.STRIPE_WEBHOOK_SECRET ?? process.env.STRIPE_BILLING_WEBHOOK_SECRET;
 
   const checks = {
+    app: true,
     supabase:
       isConfigured(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
       isConfigured(supabasePublicKey) &&
       isConfigured(supabaseServiceKey),
+    storage: isConfigured(process.env.BEATS_STORAGE_BUCKET),
     livekit:
       isConfigured(process.env.NEXT_PUBLIC_LIVEKIT_URL) &&
       isConfigured(process.env.LIVEKIT_API_KEY) &&

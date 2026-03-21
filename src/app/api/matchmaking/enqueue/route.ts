@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import {
   ensurePublicUser,
@@ -12,11 +13,17 @@ import {
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 
 export async function POST(request: Request) {
+  const logContext = createRequestLogContext(request, "/api/matchmaking/enqueue");
   try {
     const user = await getSessionUser();
     if (!user) {
-      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+      logStructured("warn", "matchmaking_enqueue_unauthenticated", logContext);
+      return withRequestId(
+        NextResponse.json({ error: "unauthenticated" }, { status: 401 }),
+        logContext.request_id,
+      );
     }
+    logContext.user_id = user.id;
 
     const body: Record<string, unknown> = await request
       .json()
@@ -48,7 +55,14 @@ export async function POST(request: Request) {
         scope,
       });
       if (existing) {
-        return NextResponse.json(existing.response, { status: existing.statusCode });
+        logStructured("info", "matchmaking_enqueue_idempotent_hit", logContext, {
+          queue_type: queueType,
+          idempotency_key: idempotencyKey,
+        });
+        return withRequestId(
+          NextResponse.json(existing.response, { status: existing.statusCode }),
+          logContext.request_id,
+        );
       }
     }
 
@@ -94,14 +108,34 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json(result);
+    logStructured("info", leave ? "matchmaking_queue_left" : "matchmaking_queue_processed", logContext, {
+      queue_type: queueType,
+      battle_format: battleFormat,
+      matched: result.matched,
+      battle_id: result.battleId ?? null,
+      is_bot_battle: result.isBotBattle ?? false,
+      wait_time_ms: result.waitTimeMs ?? null,
+      fallback_reason: result.fallbackReason ?? null,
+      idempotency_key: idempotencyKey || null,
+    });
+
+    return withRequestId(
+      NextResponse.json(result),
+      logContext.request_id,
+    );
   } catch (error: unknown) {
-    return NextResponse.json(
+    logStructured("error", "matchmaking_enqueue_failed", logContext, {
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+    return withRequestId(
+      NextResponse.json(
       {
         error: "matchmaking_enqueue_failed",
         details: error instanceof Error ? error.message : "unknown_error",
       },
       { status: 500 },
+      ),
+      logContext.request_id,
     );
   }
 }

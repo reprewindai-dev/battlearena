@@ -1,8 +1,10 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getHydratedProfile } from "@/lib/community/profile";
+import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 const UpdateOwnProfileSchema = z.object({
@@ -49,24 +51,34 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  const logContext = createRequestLogContext(req, "/api/profile/me");
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+    logStructured("error", "profile_patch_supabase_unavailable", logContext);
+    return withRequestId(NextResponse.json({ error: "Service unavailable" }, { status: 503 }), logContext.request_id);
   }
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    logStructured("warn", "profile_patch_unauthorized", logContext);
+    return withRequestId(NextResponse.json({ error: "Unauthorized" }, { status: 401 }), logContext.request_id);
   }
+  logContext.user_id = user.id;
 
   try {
     await ensurePublicUserRecord(supabase, user);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "user_bootstrap_failed" },
-      { status: 400 },
+    logStructured("warn", "profile_patch_user_bootstrap_failed", logContext, {
+      error: error instanceof Error ? error.message : "user_bootstrap_failed",
+    });
+    return withRequestId(
+      NextResponse.json(
+        { error: error instanceof Error ? error.message : "user_bootstrap_failed" },
+        { status: 400 },
+      ),
+      logContext.request_id,
     );
   }
 
@@ -97,20 +109,29 @@ export async function PATCH(req: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 });
+    logStructured("warn", "profile_patch_invalid_request", logContext, {
+      validation_error: parsed.error.flatten(),
+    });
+    return withRequestId(
+      NextResponse.json({ error: "invalid_request", details: parsed.error.flatten() }, { status: 400 }),
+      logContext.request_id,
+    );
   }
 
   if (parsed.data.handle) {
     const { error: handleError } = await supabase.from("users").update({ username: parsed.data.handle }).eq("id", user.id);
     if (handleError) {
       if (handleError.code === "23505") {
-        return NextResponse.json({ error: "Handle already taken" }, { status: 409 });
+        return withRequestId(NextResponse.json({ error: "Handle already taken" }, { status: 409 }), logContext.request_id);
       }
-      return NextResponse.json({ error: handleError.message }, { status: 500 });
+      logStructured("error", "profile_patch_handle_update_failed", logContext, {
+        error: handleError.message,
+      });
+      return withRequestId(NextResponse.json({ error: handleError.message }, { status: 500 }), logContext.request_id);
     }
   }
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("user_profiles")
     .upsert(
       {
@@ -126,13 +147,36 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    logStructured("error", "profile_patch_upsert_failed", logContext, {
+      error: error.message,
+    });
+    return withRequestId(NextResponse.json({ error: error.message }, { status: 500 }), logContext.request_id);
   }
 
   const hydratedProfile = await getHydratedProfile(supabase, user.id);
   if (!hydratedProfile) {
-    return NextResponse.json({ error: "profile_not_found_after_update" }, { status: 500 });
+    return withRequestId(NextResponse.json({ error: "profile_not_found_after_update" }, { status: 500 }), logContext.request_id);
   }
 
-  return NextResponse.json({ profile: hydratedProfile.profile });
+  await getTelemetrySystem()
+    .emitEvent({
+      event_type: "PROFILE_COMPLETED",
+      player_id: user.id,
+      event_data: {
+        handle_updated: Boolean(parsed.data.handle),
+        display_name_updated: parsed.data.display_name !== undefined,
+        avatar_updated: parsed.data.avatar_url !== undefined,
+        bio_updated: parsed.data.bio !== undefined,
+      },
+    })
+    .catch(() => null);
+
+  logStructured("info", "profile_updated", logContext, {
+    handle_updated: Boolean(parsed.data.handle),
+    display_name_updated: parsed.data.display_name !== undefined,
+    avatar_updated: parsed.data.avatar_url !== undefined,
+    bio_updated: parsed.data.bio !== undefined,
+  });
+
+  return withRequestId(NextResponse.json({ profile: hydratedProfile.profile }), logContext.request_id);
 }

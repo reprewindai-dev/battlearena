@@ -3,10 +3,18 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 
 export interface TelemetryEvent {
   event_type:
+    | "SIGNUP_COMPLETED"
+    | "PROFILE_COMPLETED"
     | "QUEUE_ENTER"
     | "QUEUE_MATCH_FOUND"
     | "MATCH_START"
     | "MATCH_END"
+    | "TOURNAMENT_REGISTERED"
+    | "CHECKOUT_STARTED"
+    | "PURCHASE_COMPLETED"
+    | "PURCHASE_FAILED"
+    | "LIVEKIT_TOKEN_ISSUED"
+    | "LIVEKIT_TOKEN_FAILED"
     | "REMATCH_OFFER_SHOWN"
     | "REMATCH_ACCEPTED"
     | "PLAYER_DISCONNECT"
