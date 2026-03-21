@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { isTerminalBattleStatus, loadBattleAccess } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
@@ -187,6 +188,19 @@ export async function POST(req: Request) {
   } catch {
     // Non-critical - swallow silently
   }
+
+  const startedAtMs = access.battle.started_at ? new Date(access.battle.started_at).getTime() : NaN;
+  const durationMs = Number.isFinite(startedAtMs) ? Math.max(0, Date.now() - startedAtMs) : 0;
+  await getTelemetrySystem()
+    .emitMatchEnd(battleId, {
+      winner: winnerSlot,
+      duration_ms: durationMs,
+      final_scores: { 1: countA, 2: countB },
+      is_close_match: Math.abs(countA - countB) <= 2,
+      is_comeback: false,
+      rage_quit_detected: false,
+    })
+    .catch(() => null);
 
   return NextResponse.json({ ok: true, mode: "supabase", battleId, result: enrichedResult, rpc: rpcData, elo: eloData, idempotent: false });
 }

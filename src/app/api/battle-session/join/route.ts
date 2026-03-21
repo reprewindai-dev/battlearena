@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { isTerminalBattleStatus } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 
 type ParticipantRow = {
   user_id: string;
@@ -16,7 +17,7 @@ async function promoteMatchedBattleToLive(params: {
 }) {
   const { supabase, battleId, startedAt } = params;
   const now = new Date();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("battles")
     .update({
       status: "live",
@@ -27,11 +28,15 @@ async function promoteMatchedBattleToLive(params: {
       updated_at: now.toISOString(),
     })
     .eq("id", battleId)
-    .eq("status", "matched");
+    .eq("status", "matched")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error(`battle_live_promotion_failed:${error.message}`);
   }
+
+  return Boolean(data?.id);
 }
 
 export async function POST(req: Request) {
@@ -107,11 +112,23 @@ export async function POST(req: Request) {
   if (existingSelf) {
     const shouldPromote = battle.status === "matched" && (Boolean(battle.is_bot_battle) || (participants?.length ?? 0) >= 2);
     if (shouldPromote) {
-      await promoteMatchedBattleToLive({
+      const promoted = await promoteMatchedBattleToLive({
         supabase,
         battleId,
         startedAt: battle.started_at,
       });
+      if (promoted) {
+        const telemetry = getTelemetrySystem();
+        await telemetry
+          .emitMatchStart(battleId, {
+            player_a_id: participants?.find((participant: ParticipantRow) => participant.slot === 1)?.user_id ?? userId,
+            player_b_id: participants?.find((participant: ParticipantRow) => participant.slot === 2)?.user_id ?? null,
+            mode: "live_room_join",
+            opponent_type: battle.is_bot_battle ? "bot" : "human",
+            governance_tier: battle.is_bot_battle ? "fallback" : "standard",
+          })
+          .catch(() => null);
+      }
     }
 
     return NextResponse.json({
@@ -152,11 +169,23 @@ export async function POST(req: Request) {
       if (existing) {
         const shouldPromote = battle.status === "matched";
         if (shouldPromote) {
-          await promoteMatchedBattleToLive({
+          const promoted = await promoteMatchedBattleToLive({
             supabase,
             battleId,
             startedAt: battle.started_at,
           });
+          if (promoted) {
+            const telemetry = getTelemetrySystem();
+            await telemetry
+              .emitMatchStart(battleId, {
+                player_a_id: participants?.find((participant: ParticipantRow) => participant.slot === 1)?.user_id ?? userId,
+                player_b_id: participants?.find((participant: ParticipantRow) => participant.slot === 2)?.user_id ?? userId,
+                mode: "live_room_join",
+                opponent_type: battle.is_bot_battle ? "bot" : "human",
+                governance_tier: battle.is_bot_battle ? "fallback" : "standard",
+              })
+              .catch(() => null);
+          }
         }
 
         return NextResponse.json({
@@ -179,11 +208,23 @@ export async function POST(req: Request) {
   }
 
   if (battle.status === "matched") {
-    await promoteMatchedBattleToLive({
+    const promoted = await promoteMatchedBattleToLive({
       supabase,
       battleId,
       startedAt: battle.started_at,
     });
+    if (promoted) {
+      const telemetry = getTelemetrySystem();
+      await telemetry
+        .emitMatchStart(battleId, {
+          player_a_id: participants?.find((participant: ParticipantRow) => participant.slot === 1)?.user_id ?? null,
+          player_b_id: userId,
+          mode: "live_room_join",
+          opponent_type: battle.is_bot_battle ? "bot" : "human",
+          governance_tier: battle.is_bot_battle ? "fallback" : "standard",
+        })
+        .catch(() => null);
+    }
   }
 
   return NextResponse.json({

@@ -9,6 +9,7 @@ import {
   runMatchmakingStep,
   writeIdempotentMatchmakingResult,
 } from "@/lib/matchmaking/server";
+import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 
 export async function POST(request: Request) {
   try {
@@ -60,6 +61,27 @@ export async function POST(request: Request) {
       leave,
       idempotencyKey: idempotencyKey || undefined,
     });
+
+    const telemetry = getTelemetrySystem();
+    await telemetry
+      .emitQueueEnter(user.id, {
+        mode: queueType,
+        region: "global",
+        player_mmr: null,
+      })
+      .catch(() => null);
+
+    if (result.matched && result.battleId) {
+      await telemetry
+        .emitQueueMatchFound(user.id, {
+          match_id: result.battleId,
+          opponent_type: result.isBotBattle ? "bot" : "human",
+          opponent_mmr: null,
+          queue_duration_ms: result.waitTimeMs,
+          governance_tier: result.isBotBattle ? "fallback" : "standard",
+        })
+        .catch(() => null);
+    }
 
     if (idempotencyKey) {
       await writeIdempotentMatchmakingResult({

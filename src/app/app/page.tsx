@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CommunityStats } from "@/components/community/CommunityStats";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -30,6 +31,8 @@ export default async function AppHomePage() {
           Battle Arena is live. Queue up, battle, and hold your place on the board.
         </p>
       </div>
+
+      <OnboardingChecklist />
 
       <CommunityStats />
 
