@@ -115,17 +115,18 @@ Recent workflow hardening completed:
   - token balance/profile reconciliation after purchase
   - subscription webhook reconciliation into `user_billing_profiles`
   - live token shop Payment Element mount on production
+- Docker Scout production image scan completed on the patched Docker build:
+  - scanned image digest `93df5874a7ed1a48411dbb6e0d443ba4b627ca9969ffea08975b56cff0dd6539`
+  - result: `0 critical`, `0 high`
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
 - tournament downstream failure compensation path should be re-verified after the latest route hardening
-- Docker Scout image scan rerun after local Docker service stability is restored
 
 ## Current Risks
 Open launch risks that must be cleared before calling the build 100 percent complete:
 - runtime verification still depends on real provider credentials and a stable browser automation environment
 - authenticated smoke and matchmaking verification require real GitHub Actions or local test credentials
-- local Docker instability has blocked repeatable LiveKit container verification on this machine
 - several older status documents in the repo overstate completion and should not be treated as proof of launch readiness
 - tournament registration still relies on app-level compensation instead of a single atomic database RPC
 
@@ -136,7 +137,7 @@ Meaning:
 - code compiles, builds, deploys, and serves production traffic
 - workflow health is green on the current repo baseline
 - critical checkout/runtime defects have been removed
-- production is not yet signed off for 100 percent completion because the blocked runtime proofs above are still open
+- production is not yet signed off for 100 percent completion because the remaining tournament registration risk above is still open
 
 ## Exit Criteria For Green
 The gate turns green only when all of the following are complete:

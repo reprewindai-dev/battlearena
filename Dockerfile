@@ -1,5 +1,6 @@
 # Multi-stage build for Arena v2 Frontend
-FROM node:20-alpine AS base
+FROM node:24.14.0-alpine AS base
+RUN npm install -g npm@11.12.0
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -32,8 +33,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-RUN apk add --no-cache curl
-
 COPY --from=builder /app/public ./public
 
 # Set the correct permission for prerender cache
