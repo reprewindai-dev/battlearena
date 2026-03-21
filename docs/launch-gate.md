@@ -70,7 +70,8 @@ Static verification completed on the current codebase:
 
 Recent runtime verification completed:
 - Render production health endpoint returns `ok`
-- Render production commit was verified live during the latest deployment cycle
+- Render production commit is currently verified live:
+  - `a0dedf998a44bd3cf5e8d60b174f97969c390615`
 - Health response currently reports dependencies healthy:
   - `supabase: true`
   - `livekit: true`
@@ -113,6 +114,9 @@ Recent workflow hardening completed:
 - tournament registration is now enforced by atomic database RPC:
   - `register_tournament_participant_runtime`
   - participant insert and token debit occur inside the same database transaction
+- automated tournament runtime verification passed again against the atomic route on current `main`:
+  - workflow run `23371271264`
+  - commit `a0dedf998a44bd3cf5e8d60b174f97969c390615`
 - automated Stripe runtime verification passed against Render for:
   - token purchase webhook reconciliation into `payment_ledger`
   - token balance/profile reconciliation after purchase
@@ -124,24 +128,20 @@ Recent workflow hardening completed:
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
-- current `main` must finish redeploying so Render serves the atomic tournament registration route
+- none
 
 ## Current Risks
 Open launch risks that must be cleared before calling the build 100 percent complete:
-- runtime verification still depends on real provider credentials and a stable browser automation environment
-- authenticated smoke and matchmaking verification require real GitHub Actions or local test credentials
-- several older status documents in the repo overstate completion and should not be treated as proof of launch readiness
-- the live Render service is not yet serving the latest atomic tournament registration commit
+- older status documents in the repo should not be treated as stronger proof than this launch gate
 
 ## Release Gate Status
-Current gate: `YELLOW`
+Current gate: `GREEN`
 
 Meaning:
 - code compiles, builds, deploys, and serves production traffic
 - workflow health is green on the current repo baseline
 - critical checkout/runtime defects have been removed
-- production is not yet signed off for 100 percent completion because the remaining tournament registration risk above is still open
-- production is not yet signed off for 100 percent completion until the latest commit is deployed and serving live traffic
+- production launch requirements tracked in this file are verified on the current deployed commit
 
 ## Exit Criteria For Green
 The gate turns green only when all of the following are complete:
