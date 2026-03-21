@@ -56,7 +56,7 @@ Required migrations and database contracts:
   - `battle_participants`
   - `matchmaking_queue`
   - `tournaments`
-  - `tournament_registrations`
+  - `tournament_participants`
   - `moderation_cases`
   - `notifications`
   - `player_stats`
@@ -70,7 +70,7 @@ Static verification completed on the current codebase:
 
 Recent runtime verification completed:
 - Render production health endpoint returns `ok`
-- Render production commit is live on `4c56613de3184b7a4940ab9bf86709d6d076336f`
+- Render production commit was verified live during the latest deployment cycle
 - Health response currently reports dependencies healthy:
   - `supabase: true`
   - `livekit: true`
@@ -110,13 +110,16 @@ Recent workflow hardening completed:
   - admin-created tournament registration flow
   - canonical `user_profiles.token_balance` debit on entry
   - duplicate registration does not double-charge
+- automated Stripe runtime verification passed against Render for:
+  - token purchase webhook reconciliation into `payment_ledger`
+  - token balance/profile reconciliation after purchase
+  - subscription webhook reconciliation into `user_billing_profiles`
+  - live token shop Payment Element mount on production
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
-- full Stripe webhook-to-profile reconciliation verification in production after live payment events
-- tournament refund-path verification after a downstream registration failure
+- tournament downstream failure compensation path should be re-verified after the latest route hardening
 - Docker Scout image scan rerun after local Docker service stability is restored
-- direct confirmation that Render has `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` set in the live service env
 
 ## Current Risks
 Open launch risks that must be cleared before calling the build 100 percent complete:
@@ -124,6 +127,7 @@ Open launch risks that must be cleared before calling the build 100 percent comp
 - authenticated smoke and matchmaking verification require real GitHub Actions or local test credentials
 - local Docker instability has blocked repeatable LiveKit container verification on this machine
 - several older status documents in the repo overstate completion and should not be treated as proof of launch readiness
+- tournament registration still relies on app-level compensation instead of a single atomic database RPC
 
 ## Release Gate Status
 Current gate: `YELLOW`
@@ -137,7 +141,7 @@ Meaning:
 ## Exit Criteria For Green
 The gate turns green only when all of the following are complete:
 - latest GitHub Actions CI and security workflows pass on current `main`
-- production Render environment includes all required vars, including `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- production Render environment includes all required vars
 - real two-user battle flow is verified end to end
 - timed bot fallback is verified end to end for casual and ranked paths
 - live payment purchase and subscription payment are verified through webhook reconciliation

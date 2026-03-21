@@ -1,76 +1,53 @@
-import { createClient } from 'redis';
+import { createClient, type RedisClientType } from 'redis';
 
-// Mock Redis for local development without Docker
-const mockRedis = {
-  get: async (key: string) => null,
-  set: async (key: string, value: string, ttl?: number) => 'OK',
-  del: async (key: string) => 1,
-  exists: async (key: string) => 0,
-  flushAll: async () => 'OK'
-};
+let client: RedisClientType | null = null;
 
-// Real Redis connection (when available)
-let client: any = null;
+function getRedisUrl() {
+  const redisUrl = process.env.REDIS_URL;
 
-export const getCache = async (key: string) => {
-  if (process.env.REDIS_URL === 'mock' || !process.env.REDIS_URL) {
-    return mockRedis.get(key);
+  if (!redisUrl || redisUrl === 'mock') {
+    throw new Error('REDIS_URL is required for content-service');
   }
-  
+
+  return redisUrl;
+}
+
+async function getClient() {
   if (!client) {
-    client = createClient({ url: process.env.REDIS_URL });
+    client = createClient({ url: getRedisUrl() });
+  }
+
+  if (!client.isOpen) {
     await client.connect();
   }
-  
-  return client.get(key);
+
+  return client;
+}
+
+export const getCache = async (key: string) => {
+  return (await getClient()).get(key);
 };
 
 export const setCache = async (key: string, value: string, ttl?: number) => {
-  if (process.env.REDIS_URL === 'mock' || !process.env.REDIS_URL) {
-    return mockRedis.set(key, value, ttl);
-  }
-  
-  if (!client) {
-    client = createClient({ url: process.env.REDIS_URL });
-    await client.connect();
-  }
-  
+  const redisClient = await getClient();
+
   if (ttl) {
-    return client.setEx(key, ttl, value);
+    return redisClient.setEx(key, ttl, value);
   }
-  
-  return client.set(key, value);
+
+  return redisClient.set(key, value);
 };
 
 export const deleteCache = async (key: string) => {
-  if (process.env.REDIS_URL === 'mock' || !process.env.REDIS_URL) {
-    return mockRedis.del(key);
-  }
-  
-  if (!client) {
-    client = createClient({ url: process.env.REDIS_URL });
-    await client.connect();
-  }
-  
-  return client.del(key);
+  return (await getClient()).del(key);
 };
 
 export const connectRedis = async () => {
-  if (process.env.REDIS_URL === 'mock' || !process.env.REDIS_URL) {
-    console.log('🔌 Using mock Redis (no Redis connection)');
-    return;
-  }
-  
   try {
-    if (!client) {
-      client = createClient({ url: process.env.REDIS_URL });
-    }
-    
-    await client.connect();
-    await client.ping();
-    console.log('✅ Connected to Redis');
+    await (await getClient()).ping();
+    console.log('Connected to Redis');
   } catch (error) {
-    console.error('❌ Failed to connect to Redis:', error);
+    console.error('Failed to connect to Redis:', error);
     throw error;
   }
 };

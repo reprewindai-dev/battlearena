@@ -3,6 +3,29 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
+async function rollbackTournamentEntryFeeCharge(
+  adminClient: ReturnType<typeof createSupabaseServiceRoleClient>,
+  userId: string,
+  amount: number,
+  transactionId?: string,
+) {
+  await adminClient.rpc("increment_user_token_balance", {
+    p_user_id: userId,
+    p_delta: amount,
+  });
+
+  if (transactionId) {
+    await adminClient.from("token_transactions").delete().eq("id", transactionId);
+    return;
+  }
+
+  await adminClient
+    .from("token_transactions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("transaction_type", "tournament_entry_fee");
+}
+
 export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -66,7 +89,8 @@ export async function POST(
     return NextResponse.json({ error: "Tournament is full" }, { status: 400 });
   }
 
-  // Deduct entry fee if applicable
+  let entryFeeTransactionId: string | undefined;
+
   if (tournament.entry_fee_tokens > 0) {
     const { data: spendResult, error: spendError } = await adminClient.rpc("spend_user_token_balance", {
       p_user_id: user.id,
@@ -81,7 +105,6 @@ export async function POST(
       ok?: boolean;
       error?: string;
       current_balance?: number;
-      new_balance?: number;
     };
 
     if (!typedSpendResult.ok) {
@@ -94,29 +117,33 @@ export async function POST(
           { status: 400 },
         );
       }
+
       return NextResponse.json(
         { error: typedSpendResult.error ?? "token_spend_failed" },
         { status: 409 },
       );
     }
 
-    const { error: txError } = await adminClient.from("token_transactions").insert({
-      user_id: user.id,
-      recipient_id: tournament.created_by,
-      tokens_spent: tournament.entry_fee_tokens,
-      points_earned: 0,
-      platform_share: 0,
-      transaction_type: "tournament_entry_fee",
-      reference_id: id,
-    });
+    const { data: txRecord, error: txError } = await adminClient
+      .from("token_transactions")
+      .insert({
+        user_id: user.id,
+        recipient_id: tournament.created_by,
+        tokens_spent: tournament.entry_fee_tokens,
+        points_earned: 0,
+        platform_share: 0,
+        transaction_type: "tournament_entry_fee",
+        reference_id: id,
+      })
+      .select("id")
+      .single();
 
     if (txError) {
-      await adminClient.rpc("increment_user_token_balance", {
-        p_user_id: user.id,
-        p_delta: tournament.entry_fee_tokens,
-      });
+      await rollbackTournamentEntryFeeCharge(adminClient, user.id, tournament.entry_fee_tokens);
       return NextResponse.json({ error: txError.message }, { status: 500 });
     }
+
+    entryFeeTransactionId = txRecord.id;
   }
 
   const { data, error } = await supabase
@@ -126,26 +153,22 @@ export async function POST(
     .single();
 
   if (error) {
-    if (error.code === "23505") {
-      if (tournament.entry_fee_tokens > 0) {
-        await adminClient.rpc("increment_user_token_balance", {
-          p_user_id: user.id,
-          p_delta: tournament.entry_fee_tokens,
-        });
+    if (tournament.entry_fee_tokens > 0) {
+      await rollbackTournamentEntryFeeCharge(
+        adminClient,
+        user.id,
+        tournament.entry_fee_tokens,
+        entryFeeTransactionId,
+      );
+    }
 
-        await adminClient
-          .from("token_transactions")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("reference_id", id)
-          .eq("transaction_type", "tournament_entry_fee");
-      }
+    if (error.code === "23505") {
       return NextResponse.json({ error: "Already registered" }, { status: 409 });
     }
+
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Create activity feed entry
   await supabase.from("activity_feed").insert({
     actor_id: user.id,
     type: "joined_tournament",
