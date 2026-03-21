@@ -110,6 +110,9 @@ Recent workflow hardening completed:
   - admin-created tournament registration flow
   - canonical `user_profiles.token_balance` debit on entry
   - duplicate registration does not double-charge
+- tournament registration is now enforced by atomic database RPC:
+  - `register_tournament_participant_runtime`
+  - participant insert and token debit occur inside the same database transaction
 - automated Stripe runtime verification passed against Render for:
   - token purchase webhook reconciliation into `payment_ledger`
   - token balance/profile reconciliation after purchase
@@ -121,14 +124,14 @@ Recent workflow hardening completed:
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
-- tournament downstream failure compensation path should be re-verified after the latest route hardening
+- current `main` must finish redeploying so Render serves the atomic tournament registration route
 
 ## Current Risks
 Open launch risks that must be cleared before calling the build 100 percent complete:
 - runtime verification still depends on real provider credentials and a stable browser automation environment
 - authenticated smoke and matchmaking verification require real GitHub Actions or local test credentials
 - several older status documents in the repo overstate completion and should not be treated as proof of launch readiness
-- tournament registration still relies on app-level compensation instead of a single atomic database RPC
+- the live Render service is not yet serving the latest atomic tournament registration commit
 
 ## Release Gate Status
 Current gate: `YELLOW`
@@ -138,6 +141,7 @@ Meaning:
 - workflow health is green on the current repo baseline
 - critical checkout/runtime defects have been removed
 - production is not yet signed off for 100 percent completion because the remaining tournament registration risk above is still open
+- production is not yet signed off for 100 percent completion until the latest commit is deployed and serving live traffic
 
 ## Exit Criteria For Green
 The gate turns green only when all of the following are complete:
