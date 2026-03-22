@@ -26,10 +26,6 @@ export function createSupabaseRouteClient(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        for (const { name, value } of cookiesToSet) {
-          request.cookies.set(name, value);
-        }
-
         response = NextResponse.next({
           request,
         });
