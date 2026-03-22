@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { z } from "zod";
 
@@ -16,8 +16,9 @@ const schema = z.object({
   password: z.string().min(6),
 });
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,14 +37,12 @@ export default function SignupPage() {
     }
 
     try {
-      const nextParam =
-        typeof window === "undefined"
-          ? null
-          : new URLSearchParams(window.location.search).get("next");
+      const nextParam = searchParams.get("next");
       const safeNextPath =
         nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
           ? nextParam
           : "/app";
+      const inviteCode = searchParams.get("invite");
 
       const response = await fetch("/api/auth/signup", {
         method: "POST",
@@ -54,6 +53,7 @@ export default function SignupPage() {
           email: parsed.data.email,
           password: parsed.data.password,
           nextPath: safeNextPath,
+          inviteCode: inviteCode ?? undefined,
         }),
       });
 
@@ -96,6 +96,11 @@ export default function SignupPage() {
               Open your Battle Arena profile, secure your handle, and step into the room ready for
               battles, tournaments, and producer discovery.
             </p>
+            {searchParams.get("invite") ? (
+              <div className="rounded-2xl border border-[#f6b73c]/25 bg-[#f6b73c]/10 px-4 py-3 text-sm text-[#ffd9a6]">
+                You are joining through a verified invite link. Attribution and activation tracking will attach automatically to your account.
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
@@ -178,6 +183,14 @@ export default function SignupPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupContent />
+    </Suspense>
   );
 }
 

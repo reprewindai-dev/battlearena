@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CommunityStats } from "@/components/community/CommunityStats";
+import { ReferralCard } from "@/components/growth/ReferralCard";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -33,6 +34,8 @@ export default async function AppHomePage() {
       </div>
 
       <OnboardingChecklist />
+
+      <ReferralCard />
 
       <CommunityStats />
 

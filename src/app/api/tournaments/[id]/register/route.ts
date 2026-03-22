@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { markReferralActivated } from "@/lib/growth/referrals";
 import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
+import { sendSystemNotification } from "@/lib/notifications/system";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
@@ -53,6 +55,16 @@ export async function POST(
   );
 
   if (registrationError) {
+    await getTelemetrySystem()
+      .emitEvent({
+        event_type: "TOURNAMENT_REGISTRATION_FAILED",
+        player_id: user.id,
+        event_data: {
+          tournament_id: id,
+          error: registrationError.message,
+        },
+      })
+      .catch(() => null);
     logStructured("error", "tournament_register_rpc_failed", logContext, {
       error: registrationError.message,
     });
@@ -79,6 +91,17 @@ export async function POST(
     if (typeof typedRegistrationResult.current_balance === "number") {
       responseBody.current_balance = typedRegistrationResult.current_balance;
     }
+
+    await getTelemetrySystem()
+      .emitEvent({
+        event_type: "TOURNAMENT_REGISTRATION_FAILED",
+        player_id: user.id,
+        event_data: {
+          tournament_id: id,
+          error: typedRegistrationResult.error ?? "tournament_registration_failed",
+        },
+      })
+      .catch(() => null);
 
     logStructured("warn", "tournament_register_rejected", logContext, {
       error: typedRegistrationResult.error ?? "tournament_registration_failed",
@@ -111,6 +134,15 @@ export async function POST(
       },
     })
     .catch(() => null);
+
+  await sendSystemNotification(adminClient, {
+    userId: user.id,
+    title: "Tournament registration confirmed",
+    body: `You are registered for ${typedRegistrationResult.tournament_name ?? "the tournament"}.`,
+    link: "/app/tournaments",
+  }).catch(() => null);
+
+  await markReferralActivated(adminClient, user.id, "first_tournament_registration").catch(() => null);
 
   logStructured("info", "tournament_registered", logContext, {
     tournament_name: typedRegistrationResult.tournament_name ?? null,

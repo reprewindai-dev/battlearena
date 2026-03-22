@@ -39,7 +39,11 @@ export async function GET(request: NextRequest) {
   const metrics = await telemetry.getMetricsDashboard(hours * 60 * 60 * 1000);
 
   const [
+    signupStarted,
     signupCompleted,
+    signupFailed,
+    loginCompleted,
+    loginFailed,
     profileCompleted,
     queueJoined,
     battleStarted,
@@ -53,7 +57,11 @@ export async function GET(request: NextRequest) {
     revenueSucceeded,
     revenueFailed,
   ] = await Promise.all([
+    countTelemetryEvents(adminClient, "SIGNUP_STARTED", sinceIso),
     countTelemetryEvents(adminClient, "SIGNUP_COMPLETED", sinceIso),
+    countTelemetryEvents(adminClient, "SIGNUP_FAILED", sinceIso),
+    countTelemetryEvents(adminClient, "LOGIN_COMPLETED", sinceIso),
+    countTelemetryEvents(adminClient, "LOGIN_FAILED", sinceIso),
     countTelemetryEvents(adminClient, "PROFILE_COMPLETED", sinceIso),
     countTelemetryEvents(adminClient, "QUEUE_ENTER", sinceIso),
     countTelemetryEvents(adminClient, "MATCH_START", sinceIso),
@@ -73,7 +81,11 @@ export async function GET(request: NextRequest) {
     hours,
     since: sinceIso,
     activation: {
+      signup_started: signupStarted,
       signup_completed: signupCompleted,
+      signup_failed: signupFailed,
+      login_completed: loginCompleted,
+      login_failed: loginFailed,
       profile_completed: profileCompleted,
       activated_total: battleCompleted + tournamentRegistered + purchaseCompleted,
     },

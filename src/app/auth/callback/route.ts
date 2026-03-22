@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { createRequestLogContext, logStructured } from "@/lib/logging/structured";
+import { recordReferralSignup } from "@/lib/growth/referrals";
 import { ensureOnboardingProgress } from "@/lib/onboarding/progress";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
@@ -55,6 +57,18 @@ export async function GET(request: Request) {
     logContext.user_id = user.id;
     await ensurePublicUserRecord(supabase, user).catch(() => null);
     await ensureOnboardingProgress(supabase, user.id).catch(() => null);
+    const referralCode =
+      typeof user.user_metadata?.referral_code === "string"
+        ? user.user_metadata.referral_code.trim().toLowerCase()
+        : null;
+    if (referralCode) {
+      try {
+        const adminClient = createSupabaseServiceRoleClient();
+        await recordReferralSignup(adminClient, user.id, referralCode).catch(() => null);
+      } catch {
+        // Non-fatal
+      }
+    }
     await getTelemetrySystem()
       .emitEvent({
         event_type: "SIGNUP_COMPLETED",

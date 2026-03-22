@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { markReferralActivated } from "@/lib/growth/referrals";
 import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
+import { sendSystemNotification } from "@/lib/notifications/system";
 import { getStripeClient } from "@/lib/payments/stripe";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
@@ -181,6 +183,15 @@ export async function POST(request: Request) {
         },
       })
       .catch(() => null);
+
+    await sendSystemNotification(adminClient, {
+      userId: user.id,
+      title: "Purchase confirmed",
+      body: `Your token purchase is complete and ${typedFinalize.tokens_granted ?? 0} tokens are available on your account.`,
+      link: "/app/shop",
+    }).catch(() => null);
+
+    await markReferralActivated(adminClient, user.id, "first_purchase").catch(() => null);
 
     logStructured("info", "token_purchase_confirmed", logContext, {
       payment_intent_id: paymentIntent.id,

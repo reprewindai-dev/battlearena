@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
 import { createSupabaseRouteClient } from "@/lib/supabase/route";
+import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 const loginSchema = z.object({
@@ -34,10 +35,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const emailDomain = parsed.data.email.split("@")[1] ?? null;
     const { supabase, getResponse } = createSupabaseRouteClient(request);
     const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
 
     if (error) {
+      await getTelemetrySystem()
+        .emitEvent({
+          event_type: "LOGIN_FAILED",
+          event_data: {
+            error: error.message,
+            email_domain: emailDomain,
+          },
+        })
+        .catch(() => null);
       logStructured("warn", "auth_login_failed", logContext, {
         error: error.message,
       });
@@ -51,6 +62,15 @@ export async function POST(request: NextRequest) {
     if (data.user) {
       logContext.user_id = data.user.id;
       await ensurePublicUserRecord(supabase, data.user).catch(() => null);
+      await getTelemetrySystem()
+        .emitEvent({
+          event_type: "LOGIN_COMPLETED",
+          player_id: data.user.id,
+          event_data: {
+            email_domain: emailDomain,
+          },
+        })
+        .catch(() => null);
     }
 
     const response = NextResponse.json(
@@ -73,6 +93,14 @@ export async function POST(request: NextRequest) {
     logStructured("info", "auth_login_completed", logContext);
     return withRequestId(response, logContext.request_id);
   } catch (error) {
+    await getTelemetrySystem()
+      .emitEvent({
+        event_type: "LOGIN_FAILED",
+        event_data: {
+          error: error instanceof Error ? error.message : "unknown_error",
+        },
+      })
+      .catch(() => null);
     logStructured("error", "auth_login_route_failed", logContext, {
       error: error instanceof Error ? error.message : "unknown_error",
     });

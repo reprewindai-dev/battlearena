@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 
 import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { isTerminalBattleStatus, loadBattleAccess } from "@/lib/battle/access";
+import { markReferralActivated } from "@/lib/growth/referrals";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 
 export async function POST(req: Request) {
@@ -201,6 +203,20 @@ export async function POST(req: Request) {
       rage_quit_detected: false,
     })
     .catch(() => null);
+
+  try {
+    const adminClient = createSupabaseServiceRoleClient();
+    await Promise.all(
+      (participants ?? [])
+        .map((participant: { user_id?: string | null }) => participant.user_id)
+        .filter((participantId: string | null | undefined): participantId is string => Boolean(participantId))
+        .map((participantId: string) =>
+          markReferralActivated(adminClient, participantId, "first_battle_completed").catch(() => null),
+        ),
+    );
+  } catch {
+    // Non-critical
+  }
 
   return NextResponse.json({ ok: true, mode: "supabase", battleId, result: enrichedResult, rpc: rpcData, elo: eloData, idempotent: false });
 }
