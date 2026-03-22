@@ -1,0 +1,61 @@
+name: Publish GHCR Image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional tag override
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image metadata
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/battlearena"
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            PRIMARY_TAG="${{ github.event.inputs.image_tag }}"
+          else
+            PRIMARY_TAG="sha-${SHORT_SHA}"
+          fi
+          {
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "PRIMARY_TAG=${PRIMARY_TAG}"
+            echo "SECONDARY_TAG=main"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.PRIMARY_TAG }}
+            ${{ env.IMAGE_NAME }}:${{ env.SECONDARY_TAG }}
+          provenance: false
+          sbom: false
