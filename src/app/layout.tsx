@@ -5,9 +5,10 @@ import "./globals.css";
 import Providers from "@/app/providers";
 
 const geist = Geist({ subsets: ["latin"] });
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://battlearena-poon.onrender.com";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(appUrl),
   title: "Spitzone - Live Freestyle Battles",
   description: "Spitzone is a live freestyle battle network for real matchups, real beats, and real competitive rooms.",
   keywords: ["hip-hop", "rap battles", "freestyle battles", "beats", "music battles", "trap", "drill", "spitzone"],
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: process.env.NEXT_PUBLIC_APP_URL ?? "https://battlearena-poon.onrender.com",
+    url: appUrl,
     title: "Spitzone - Live Freestyle Battles",
     description: "Live freestyle battles, real matchmaking, and competitive rooms built for performance.",
     siteName: "Spitzone",
