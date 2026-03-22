@@ -32,6 +32,16 @@ type ParticipantRow = {
   room_id: string;
 };
 
+type CreatorUserRow = {
+  id: string;
+  username: string | null;
+};
+
+type CreatorProfileRow = {
+  user_id: string;
+  avatar_url: string | null;
+};
+
 async function generateRoomCode(adminClient: ReturnType<typeof createSupabaseServiceRoleClient>): Promise<string> {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
@@ -94,13 +104,19 @@ export async function GET(request: Request) {
     const roomIds = rooms.map((room) => room.id);
     const creatorIds = Array.from(new Set(rooms.map((room) => room.created_by).filter((v): v is string => Boolean(v))));
 
-    const [{ data: participantsRaw }, { data: creatorsRaw }] = await Promise.all([
+    const [{ data: participantsRaw }, creatorQueryResults] = await Promise.all([
       roomIds.length > 0
         ? adminClient.from("room_participants").select("room_id").in("room_id", roomIds)
         : Promise.resolve({ data: [] as ParticipantRow[] }),
       creatorIds.length > 0
-        ? adminClient.from("user_profiles").select("id,handle,avatar_url").in("id", creatorIds)
-        : Promise.resolve({ data: [] as Array<{ id: string; handle: string | null; avatar_url: string | null }> }),
+        ? Promise.all([
+            adminClient.from("users").select("id,username").in("id", creatorIds),
+            adminClient.from("user_profiles").select("user_id,avatar_url").in("user_id", creatorIds),
+          ])
+        : Promise.resolve([
+            { data: [] as CreatorUserRow[] },
+            { data: [] as CreatorProfileRow[] },
+          ]),
     ]);
 
     const participantCounts = (participantsRaw ?? []).reduce((acc, row) => {
@@ -109,12 +125,20 @@ export async function GET(request: Request) {
       return acc;
     }, new Map<string, number>());
 
+    const [creatorUsersResult, creatorProfilesResult] = creatorQueryResults as [
+      { data: CreatorUserRow[] | null },
+      { data: CreatorProfileRow[] | null },
+    ];
+    const creatorProfileMap = new Map<string, CreatorProfileRow>(
+      (creatorProfilesResult.data ?? []).map((row) => [row.user_id, row]),
+    );
     const creators = new Map<string, { id: string; username: string; avatar_url?: string }>();
-    for (const row of creatorsRaw ?? []) {
+    for (const row of creatorUsersResult.data ?? []) {
+      const creatorProfile = creatorProfileMap.get(row.id);
       creators.set(row.id, {
         id: row.id,
-        username: row.handle ?? `user_${row.id.slice(0, 8)}`,
-        avatar_url: row.avatar_url ?? undefined,
+        username: row.username ?? `user_${row.id.slice(0, 8)}`,
+        avatar_url: creatorProfile?.avatar_url ?? undefined,
       });
     }
 

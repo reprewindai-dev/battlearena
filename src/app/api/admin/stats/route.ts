@@ -18,7 +18,7 @@ export async function GET() {
     openCasesRes,
     activityRes,
   ] = await Promise.all([
-    supabase.from("user_profiles").select("id", { count: "exact", head: true }),
+    supabase.from("users").select("id", { count: "exact", head: true }),
     supabase.from("battles").select("id", { count: "exact", head: true }),
     supabase.from("battles").select("id", { count: "exact", head: true }).eq("status", "live"),
     supabase.from("tournaments").select("id", { count: "exact", head: true }),

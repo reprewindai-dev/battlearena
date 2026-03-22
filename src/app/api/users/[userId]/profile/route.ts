@@ -116,15 +116,15 @@ export async function PATCH(
     .from("user_profiles")
     .upsert(
       {
-        id: userId,
+        user_id: userId,
         display_name: parsed.data.display_name ?? null,
         bio: parsed.data.bio ?? null,
         avatar_url: parsed.data.avatar_url ?? null,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "id" },
+      { onConflict: "user_id" },
     )
-    .select("id")
+    .select("user_id")
     .single();
 
   if (error) {
