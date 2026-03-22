@@ -85,6 +85,33 @@ async function login(page: Page, credentials: Credentials) {
   await expect(page).toHaveURL(/\/app/, { timeout: 10_000 });
 }
 
+async function browserFetch(page: Page, path: string, init?: { method?: string; body?: unknown }) {
+  return page.evaluate(
+    async ({ targetPath, requestInit }) => {
+      const response = await fetch(targetPath, {
+        method: requestInit?.method ?? "GET",
+        headers: requestInit?.body ? { "content-type": "application/json" } : undefined,
+        body: requestInit?.body ? JSON.stringify(requestInit.body) : undefined,
+      });
+
+      const text = await response.text();
+      let body: unknown = text;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
+
+      return {
+        ok: response.ok,
+        status: response.status,
+        body,
+      };
+    },
+    { targetPath: path, requestInit: init ?? null },
+  );
+}
+
 async function getBattleRow(battleId: string) {
   const client = requireAdminClient();
   const { data, error } = await client
@@ -145,6 +172,7 @@ test.describe("human matchmaking runtime verification", () => {
 
   test("two users queue, match, join the same live room, finalize, and can requeue", async ({ browser }) => {
     test.setTimeout(180_000);
+    const battleFormat = `e2e${Date.now().toString().slice(-8)}`;
 
     const userA = await createVerifiedUser("human_match_a");
     const userB = await createVerifiedUser("human_match_b");
@@ -157,20 +185,26 @@ test.describe("human matchmaking runtime verification", () => {
     await login(pageA, userA);
     await login(pageB, userB);
 
-    const enqueueA = await pageA.request.post("/api/matchmaking/enqueue", {
-      data: { queueType: "freestyle", battleFormat: "60s" },
+    const enqueueA = await browserFetch(pageA, "/api/matchmaking/enqueue", {
+      method: "POST",
+      body: { queueType: "freestyle", battleFormat },
     });
-    expect(enqueueA.ok()).toBeTruthy();
-    const enqueueABody = (await enqueueA.json()) as MatchmakingBody;
+    if (!enqueueA.ok) {
+      throw new Error(`enqueue_a_failed:${enqueueA.status}:${JSON.stringify(enqueueA.body)}`);
+    }
+    const enqueueABody = enqueueA.body as MatchmakingBody;
     expect(enqueueABody.status).toBe("queued");
     expect(enqueueABody.matched).toBe(false);
     expect(enqueueABody.battleId).toBeNull();
 
-    const enqueueB = await pageB.request.post("/api/matchmaking/enqueue", {
-      data: { queueType: "freestyle", battleFormat: "60s" },
+    const enqueueB = await browserFetch(pageB, "/api/matchmaking/enqueue", {
+      method: "POST",
+      body: { queueType: "freestyle", battleFormat },
     });
-    expect(enqueueB.ok()).toBeTruthy();
-    const enqueueBBody = (await enqueueB.json()) as MatchmakingBody;
+    if (!enqueueB.ok) {
+      throw new Error(`enqueue_b_failed:${enqueueB.status}:${JSON.stringify(enqueueB.body)}`);
+    }
+    const enqueueBBody = enqueueB.body as MatchmakingBody;
     expect(enqueueBBody.status).toBe("matched");
     expect(enqueueBBody.matched).toBe(true);
     expect(enqueueBBody.isBotBattle).toBe(false);
@@ -182,11 +216,14 @@ test.describe("human matchmaking runtime verification", () => {
 
     await expect
       .poll(async () => {
-        const response = await pageA.request.get("/api/matchmaking/status?queueType=freestyle&battleFormat=60s");
-        if (!response.ok()) {
+        const response = await browserFetch(
+          pageA,
+          `/api/matchmaking/status?queueType=freestyle&battleFormat=${encodeURIComponent(battleFormat)}`,
+        );
+        if (!response.ok) {
           return null;
         }
-        return (await response.json()) as MatchmakingBody;
+        return response.body as MatchmakingBody;
       }, { timeout: 30_000, intervals: [1000, 2000, 5000] })
       .toMatchObject({
         status: "matched",
@@ -199,17 +236,17 @@ test.describe("human matchmaking runtime verification", () => {
     const battleBeforeJoin = await getBattleRow(battleId);
     expect(battleBeforeJoin.status).toBe("matched");
     expect(battleBeforeJoin.queue_type).toBe("freestyle");
-    expect(battleBeforeJoin.battle_format).toBe("60s");
+    expect(battleBeforeJoin.battle_format).toBe(battleFormat);
     expect(battleBeforeJoin.is_bot_battle).toBeFalsy();
 
     const participantsBeforeJoin = await getBattleParticipants(battleId);
     expect(participantsBeforeJoin).toHaveLength(2);
     expect(participantsBeforeJoin.map((participant) => participant.user_id).sort()).toEqual([userA.id, userB.id].sort());
 
-    const joinA = await pageA.request.post("/api/battle-session/join", { data: { battleId } });
-    const joinB = await pageB.request.post("/api/battle-session/join", { data: { battleId } });
-    expect(joinA.ok()).toBeTruthy();
-    expect(joinB.ok()).toBeTruthy();
+    const joinA = await browserFetch(pageA, "/api/battle-session/join", { method: "POST", body: { battleId } });
+    const joinB = await browserFetch(pageB, "/api/battle-session/join", { method: "POST", body: { battleId } });
+    expect(joinA.ok).toBeTruthy();
+    expect(joinB.ok).toBeTruthy();
 
     await expect
       .poll(async () => {
@@ -218,10 +255,10 @@ test.describe("human matchmaking runtime verification", () => {
       }, { timeout: 20_000, intervals: [1000, 2000, 5000] })
       .toBe("live");
 
-    const tokenProbeA = await pageA.request.get(`/api/livekit/token?room=${encodeURIComponent(battleId)}`);
-    const tokenProbeB = await pageB.request.get(`/api/livekit/token?room=${encodeURIComponent(battleId)}`);
-    expect(tokenProbeA.ok()).toBeTruthy();
-    expect(tokenProbeB.ok()).toBeTruthy();
+    const tokenProbeA = await browserFetch(pageA, `/api/livekit/token?room=${encodeURIComponent(battleId)}`);
+    const tokenProbeB = await browserFetch(pageB, `/api/livekit/token?room=${encodeURIComponent(battleId)}`);
+    expect(tokenProbeA.ok).toBeTruthy();
+    expect(tokenProbeB.ok).toBeTruthy();
 
     const battleUrl = `/app/battles/room?battleId=${encodeURIComponent(battleId)}`;
     await pageA.goto(battleUrl);
@@ -267,11 +304,12 @@ test.describe("human matchmaking runtime verification", () => {
       })
       .eq("id", battleId);
 
-    const finalizeOwner = battleBeforeJoin.created_by === userA.id ? pageA : pageB;
-    const finalizeResponse = await finalizeOwner.request.post("/api/battle-session/finalize", {
-      data: { battleId },
+    const finalizePage = battleBeforeJoin.created_by === userA.id ? pageA : pageB;
+    const finalizeResponse = await browserFetch(finalizePage, "/api/battle-session/finalize", {
+      method: "POST",
+      body: { battleId },
     });
-    expect(finalizeResponse.ok()).toBeTruthy();
+    expect(finalizeResponse.ok).toBeTruthy();
 
     await expect
       .poll(async () => {
@@ -280,16 +318,18 @@ test.describe("human matchmaking runtime verification", () => {
       }, { timeout: 20_000, intervals: [1000, 2000, 5000] })
       .toBe("saved");
 
-    const requeue = await pageA.request.post("/api/matchmaking/enqueue", {
-      data: { queueType: "freestyle", battleFormat: "60s", action: "leave" },
+    const requeue = await browserFetch(pageA, "/api/matchmaking/enqueue", {
+      method: "POST",
+      body: { queueType: "freestyle", battleFormat, action: "leave" },
     });
-    expect(requeue.ok()).toBeTruthy();
+    expect(requeue.ok).toBeTruthy();
 
-    const requeueAgain = await pageA.request.post("/api/matchmaking/enqueue", {
-      data: { queueType: "freestyle", battleFormat: "60s" },
+    const requeueAgain = await browserFetch(pageA, "/api/matchmaking/enqueue", {
+      method: "POST",
+      body: { queueType: "freestyle", battleFormat },
     });
-    expect(requeueAgain.ok()).toBeTruthy();
-    const requeueBody = (await requeueAgain.json()) as MatchmakingBody;
+    expect(requeueAgain.ok).toBeTruthy();
+    const requeueBody = requeueAgain.body as MatchmakingBody;
     expect(requeueBody.status).toBe("queued");
     expect(requeueBody.matched).toBe(false);
 

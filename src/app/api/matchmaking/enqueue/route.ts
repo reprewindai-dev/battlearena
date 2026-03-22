@@ -12,6 +12,13 @@ import {
 } from "@/lib/matchmaking/server";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 
+function normalizeBattleFormat(value: unknown) {
+  if (typeof value !== "string") return "60s";
+  const trimmed = value.trim();
+  if (!trimmed) return "60s";
+  return trimmed.slice(0, 20);
+}
+
 export async function POST(request: Request) {
   const logContext = createRequestLogContext(request, "/api/matchmaking/enqueue");
   try {
@@ -29,7 +36,7 @@ export async function POST(request: Request) {
       .json()
       .catch(() => ({} as Record<string, unknown>));
     const queueType = normalizeQueueMode(body.queueType);
-    const battleFormat = typeof body.battleFormat === "string" ? body.battleFormat : "60s";
+    const battleFormat = normalizeBattleFormat(body.battleFormat);
     const preferredGenres = Array.isArray(body.preferredGenres)
       ? body.preferredGenres.filter((v): v is string => typeof v === "string")
       : [];
