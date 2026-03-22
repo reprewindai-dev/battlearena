@@ -14,11 +14,7 @@ export function createSupabaseRouteClient(request: NextRequest) {
     throw new Error("supabase_public_config_missing");
   }
 
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  let response = new NextResponse(null);
 
   const supabase = createServerClient(url, publicKey, {
     cookies: {
@@ -26,9 +22,7 @@ export function createSupabaseRouteClient(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        response = NextResponse.next({
-          request,
-        });
+        response = new NextResponse(null);
 
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
