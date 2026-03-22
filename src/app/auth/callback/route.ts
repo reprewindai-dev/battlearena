@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { createRequestLogContext, logStructured } from "@/lib/logging/structured";
+import { ensureOnboardingProgress } from "@/lib/onboarding/progress";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
+import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
 export async function GET(request: Request) {
   const logContext = createRequestLogContext(request, "/auth/callback");
@@ -51,6 +53,8 @@ export async function GET(request: Request) {
 
   if (user) {
     logContext.user_id = user.id;
+    await ensurePublicUserRecord(supabase, user).catch(() => null);
+    await ensureOnboardingProgress(supabase, user.id).catch(() => null);
     await getTelemetrySystem()
       .emitEvent({
         event_type: "SIGNUP_COMPLETED",
