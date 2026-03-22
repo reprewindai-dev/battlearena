@@ -115,7 +115,7 @@ export async function getOnboardingState(adminClient: SupabaseClient, userId: st
   if (!progress.welcome_notification_sent_at) {
     await sendSystemNotification(adminClient, {
       userId,
-      title: "Welcome to Battle Arena",
+      title: "Welcome to Spitzone",
       body: "Complete your setup checklist to unlock battles, community momentum, and monetization paths.",
       link: "/app",
     }).catch(() => null);

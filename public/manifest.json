@@ -1,7 +1,7 @@
 {
-  "name": "BattleArena",
-  "short_name": "BattleArena",
-  "description": "The ultimate hip-hop battle platform. Compete in rap battles, showcase your beats, and win prizes.",
+  "name": "Spitzone",
+  "short_name": "Spitzone",
+  "description": "Spitzone is the live freestyle battle network for real-time matchups, premium beats, and competitive rooms.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

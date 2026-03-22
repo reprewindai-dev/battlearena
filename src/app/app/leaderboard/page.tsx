@@ -1,7 +1,7 @@
 import { Leaderboard } from "@/components/community/Leaderboard";
 import { CommunityStats } from "@/components/community/CommunityStats";
 
-export const metadata = { title: "Leaderboard - Battle Arena" };
+export const metadata = { title: "Leaderboard - Spitzone" };
 
 export default function LeaderboardPage() {
   return (

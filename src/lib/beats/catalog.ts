@@ -68,7 +68,7 @@ export function buildFallbackArtworkSvg(input: { title: string; producerName: st
   <circle cx="920" cy="220" r="180" fill="rgba(255,255,255,0.08)"/>
   <circle cx="220" cy="980" r="220" fill="rgba(255,255,255,0.06)"/>
   <rect x="96" y="96" width="1008" height="1008" rx="36" fill="rgba(0,0,0,0.24)" stroke="rgba(255,255,255,0.15)"/>
-  <text x="120" y="210" fill="#ffe7d2" font-family="Arial, sans-serif" font-size="40" font-weight="700" letter-spacing="6">BATTLE ARENA</text>
+  <text x="120" y="210" fill="#ffe7d2" font-family="Arial, sans-serif" font-size="40" font-weight="700" letter-spacing="6">SPITZONE</text>
   <text x="120" y="560" fill="#ffffff" font-family="Arial, sans-serif" font-size="96" font-weight="800">${title}</text>
   <text x="120" y="660" fill="#ffd4a8" font-family="Arial, sans-serif" font-size="48" font-weight="600">${producer}</text>
   <text x="120" y="840" fill="#ffffff" font-family="Arial, sans-serif" font-size="34" font-weight="700">${input.bpm} BPM</text>
