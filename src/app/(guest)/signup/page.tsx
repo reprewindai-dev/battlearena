@@ -72,7 +72,7 @@ function SignupContent() {
         return;
       }
 
-      setSuccess("Account created. Check your email to confirm your Battle Arena account before signing in.");
+      setSuccess("Account created. Check your email to confirm your Spitzone account before signing in.");
     } catch {
       setError(
         "Signup is temporarily unavailable. Try again in a moment.",
@@ -93,7 +93,7 @@ function SignupContent() {
               Claim your identity before the crowd gets here.
             </h1>
             <p className="max-w-lg text-sm leading-6 text-white/70 sm:text-base">
-              Open your Battle Arena profile, secure your handle, and step into the room ready for
+              Open your Spitzone profile, secure your handle, and step into the room ready for
               battles, tournaments, and producer discovery.
             </p>
             {searchParams.get("invite") ? (

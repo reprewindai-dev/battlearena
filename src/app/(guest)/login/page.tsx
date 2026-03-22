@@ -21,7 +21,7 @@ export default async function LoginPage({
               Walk back into the room with real opponents, real beats, and a live crowd.
             </h1>
             <p className="max-w-lg text-sm leading-6 text-white/70 sm:text-base">
-              Battle Arena is the premium cockpit for competitive performance. Log in to queue,
+              Spitzone is the premium cockpit for competitive performance. Log in to queue,
               manage your profile, register for tournaments, and run live sessions without
               simulation shortcuts.
             </p>

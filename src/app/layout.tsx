@@ -8,12 +8,12 @@ const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
-  title: "Battle Arena - Live Audio Battle Arena",
-  description: "Battle Arena is a live audio battle arena for real matchups, real beats, and real competitive rooms.",
-  keywords: ["hip-hop", "rap battles", "beats", "music battles", "trap", "drill", "battle arena"],
-  authors: [{ name: "Battle Arena" }],
-  creator: "Battle Arena",
-  publisher: "Battle Arena",
+  title: "Spitzone - Live Freestyle Battles",
+  description: "Spitzone is a live freestyle battle network for real matchups, real beats, and real competitive rooms.",
+  keywords: ["hip-hop", "rap battles", "freestyle battles", "beats", "music battles", "trap", "drill", "spitzone"],
+  authors: [{ name: "Spitzone" }],
+  creator: "Spitzone",
+  publisher: "Spitzone",
   formatDetection: {
     email: false,
     address: false,
@@ -23,22 +23,22 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     url: process.env.NEXT_PUBLIC_APP_URL ?? "https://battlearena-poon.onrender.com",
-    title: "Battle Arena - Live Audio Battle Arena",
-    description: "Live audio battles, real matchmaking, and competitive rooms built for performance.",
-    siteName: "Battle Arena",
+    title: "Spitzone - Live Freestyle Battles",
+    description: "Live freestyle battles, real matchmaking, and competitive rooms built for performance.",
+    siteName: "Spitzone",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Battle Arena - Live Audio Battle Arena",
+        alt: "Spitzone - Live Freestyle Battles",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Battle Arena - Live Audio Battle Arena",
-    description: "Live audio battles, real matchmaking, and competitive rooms built for performance.",
+    title: "Spitzone - Live Freestyle Battles",
+    description: "Live freestyle battles, real matchmaking, and competitive rooms built for performance.",
     images: ["/og-image.jpg"],
   },
 };

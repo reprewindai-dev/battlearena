@@ -80,7 +80,7 @@ export function OnboardingChecklist() {
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Onboarding</div>
-            <h2 className="mt-1 text-xl font-bold text-foreground">Activate your Battle Arena account</h2>
+            <h2 className="mt-1 text-xl font-bold text-foreground">Activate your Spitzone account</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Complete the real production checklist so battles, monetization, and community loops are live on your account.
             </p>

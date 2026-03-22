@@ -116,7 +116,7 @@ export default function BattleLobby({ onJoinBattle, onSpectateBattle, onCreateBa
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Battle Arena</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Spitzone</h1>
           <p className="text-gray-400">Join or spectate live battles</p>
         </div>
         <Button onClick={onCreateBattle} className="bg-primary hover:bg-primary/90">
