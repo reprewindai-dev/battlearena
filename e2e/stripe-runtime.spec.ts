@@ -86,7 +86,7 @@ async function getTokenBalance(userId: string) {
   const { data, error } = await client
     .from("user_profiles")
     .select("token_balance")
-    .eq("id", userId)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -131,7 +131,7 @@ test.afterAll(async () => {
     await adminClient.from("payment_ledger").delete().in("user_id", createdUserIds);
     await adminClient.from("user_billing_profiles").delete().in("user_id", createdUserIds);
     await adminClient.from("users").delete().in("id", createdUserIds);
-    await adminClient.from("user_profiles").delete().in("id", createdUserIds);
+    await adminClient.from("user_profiles").delete().in("user_id", createdUserIds);
 
     for (const userId of createdUserIds) {
       await adminClient.auth.admin.deleteUser(userId);

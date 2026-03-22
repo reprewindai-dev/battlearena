@@ -69,7 +69,7 @@ async function getTokenBalance(userId: string) {
   const { data, error } = await client
     .from("user_profiles")
     .select("token_balance")
-    .eq("id", userId)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -91,7 +91,7 @@ test.afterAll(async () => {
 
   if (createdUserIds.length > 0) {
     await adminClient.from("users").delete().in("id", createdUserIds);
-    await adminClient.from("user_profiles").delete().in("id", createdUserIds);
+    await adminClient.from("user_profiles").delete().in("user_id", createdUserIds);
     for (const userId of createdUserIds) {
       await adminClient.auth.admin.deleteUser(userId);
     }
@@ -133,6 +133,12 @@ test.describe("tournament runtime verification", () => {
     expect(tournamentId).toBeTruthy();
     createdTournamentIds.push(tournamentId as string);
 
+    const playerContext = await browser.newContext();
+    const playerPage = await playerContext.newPage();
+    await login(playerPage, player);
+    const bootstrapResponse = await playerPage.request.get("/api/profile/me");
+    expect(bootstrapResponse.status()).toBe(200);
+
     const client = requireAdminClient();
     const { error: fundError } = await client.rpc("increment_user_token_balance", {
       p_user_id: player.id,
@@ -144,10 +150,6 @@ test.describe("tournament runtime verification", () => {
 
     const balanceBefore = await getTokenBalance(player.id);
     expect(balanceBefore).toBeGreaterThanOrEqual(100);
-
-    const playerContext = await browser.newContext();
-    const playerPage = await playerContext.newPage();
-    await login(playerPage, player);
 
     const registerResponse = await playerPage.request.post(
       `/api/tournaments/${encodeURIComponent(tournamentId as string)}/register`,
