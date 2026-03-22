@@ -82,13 +82,18 @@ async function insertBattleParticipants(adminClient: AdminClient, battleId: stri
 
 async function createHumanBattle(adminClient: AdminClient, userA: string, userB: string, queueType: QueueMode, battleFormat: string) {
   const roomId = `battle_${Date.now()}_${randomUUID().slice(0, 8)}`;
+  const battleType = queueType === "ranked" ? "ranked" : queueType === "tournament" ? "tournament" : "casual";
+  const mode = queueType === "ranked" ? "ranked" : "freestyle";
   const { data: battle, error } = await adminClient
     .from("battles")
     .insert({
       created_by: userA,
       participant_1_id: userA,
       participant_2_id: userB,
+      mode,
       queue_type: queueType,
+      battle_type: battleType,
+      format: battleFormat,
       battle_format: battleFormat,
       status: "matched",
       room_id: roomId,

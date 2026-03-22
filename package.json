@@ -31,6 +31,7 @@
     "test:e2e:live": "playwright test e2e/smoke.spec.ts -c playwright.config.mts",
     "test:e2e:live-video": "playwright test e2e/live-video.spec.ts -c playwright.config.mts",
     "test:e2e:matchmaking-bot": "playwright test e2e/matchmaking-bot.spec.ts -c playwright.config.mts",
+    "test:e2e:matchmaking-human": "playwright test e2e/matchmaking-human.spec.ts -c playwright.config.mts",
     "test:e2e:beats-runtime": "playwright test e2e/beats-runtime.spec.ts -c playwright.config.mts",
     "test:e2e:tournaments-runtime": "playwright test e2e/tournaments-runtime.spec.ts -c playwright.config.mts",
     "test:e2e:stripe-runtime": "playwright test e2e/stripe-runtime.spec.ts -c playwright.config.mts"
