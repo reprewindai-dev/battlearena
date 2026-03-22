@@ -91,21 +91,6 @@ export async function POST(req: Request) {
     mmr_neutral: Boolean(access.battle.mmr_neutral),
   };
 
-  const { error: updateParticipantsError } = await supabase
-    .from("battle_participants")
-    .update({ score: null })
-    .eq("battle_id", battleId);
-
-  if (updateParticipantsError) {
-    return NextResponse.json(
-      {
-        error: "participant_update_failed",
-        details: updateParticipantsError.message,
-      },
-      { status: 400 },
-    );
-  }
-
   const { data: participants, error: participantsError } = await supabase
     .from("battle_participants")
     .select("id,user_id,slot")
