@@ -1,10 +1,22 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bebas_Neue, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
 import Providers from "@/app/providers";
 
-const geist = Geist({ subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+});
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+});
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-bebas-neue",
+});
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://battlearena-poon.onrender.com";
 
 export const metadata: Metadata = {
@@ -62,7 +74,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${geist.className} bg-black text-white overflow-x-hidden`}>
+      <body
+        className={`${spaceGrotesk.variable} ${jetBrainsMono.variable} ${bebasNeue.variable} overflow-x-hidden bg-black text-white antialiased`}
+      >
         <Providers>{children}</Providers>
       </body>
     </html>

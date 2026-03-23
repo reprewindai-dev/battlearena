@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { BattleArenaLogo, BattleArenaWordmark } from "@/components/brand/Logo";
 import { NotificationBell } from "@/components/community/NotificationBell";
 import { SearchBar } from "@/components/community/SearchBar";
 import { Button } from "@/components/ui/button";
@@ -44,28 +45,31 @@ export default async function AppLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Link href="/app" className="shrink-0">
-            <span className="text-lg font-black tracking-tight">SPITZONE</span>
+    <div className="spitzone-shell-background spitzone-noise min-h-screen text-foreground">
+      <header className="sticky top-0 z-40 border-b border-white/8 bg-black/30 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
+          <Link href="/app" className="flex shrink-0 items-center gap-3">
+            <BattleArenaLogo size="medium" />
+            <div className="hidden sm:block">
+              <BattleArenaWordmark size="small" />
+            </div>
           </Link>
 
           <div className="hidden max-w-xs flex-1 md:block">
             <SearchBar compact />
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm" className="hidden rounded-full border border-white/8 bg-white/4 text-white/80 hover:bg-white/10 sm:inline-flex">
               <Link href="/app/community">Community</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden rounded-full border border-white/8 bg-white/4 text-white/80 hover:bg-white/10 sm:inline-flex">
               <Link href="/app/battles">Battles</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden rounded-full border border-white/8 bg-white/4 text-white/80 hover:bg-white/10 sm:inline-flex">
               <Link href="/app/leaderboard">Ranks</Link>
             </Button>
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+            <Button asChild variant="ghost" size="sm" className="hidden rounded-full border border-white/8 bg-white/4 text-white/80 hover:bg-white/10 sm:inline-flex">
               <Link href="/app/shop">Shop</Link>
             </Button>
 
@@ -73,12 +77,12 @@ export default async function AppLayout({
 
             <NotificationBell />
 
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/app/profile" className="flex items-center gap-1.5">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-bold">
+            <Button asChild variant="ghost" size="sm" className="rounded-full border border-white/8 bg-white/4 text-white/80 hover:bg-white/10">
+              <Link href="/app/profile" className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-xs font-bold text-primary">
                   {(user.email?.[0] ?? "U").toUpperCase()}
                 </span>
-                <span className="hidden sm:inline">{role}</span>
+                <span className="hidden text-xs uppercase tracking-[0.2em] text-white/58 sm:inline">{role}</span>
               </Link>
             </Button>
           </div>
@@ -87,18 +91,19 @@ export default async function AppLayout({
 
       <div className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-4 py-6 sm:px-6">
         <aside className="col-span-12 md:col-span-3 xl:col-span-2">
-          <nav className="sticky top-20 rounded-xl border border-border/60 bg-card/30 p-3 backdrop-blur">
-            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-              Navigation
+          <nav className="spitzone-panel-strong spitzone-metal-line sticky top-24 p-4">
+            <div className="mb-3 px-2">
+              <div className="spitzone-kicker">Network map</div>
+              <div className="mt-1 text-xs text-white/56">Queues, rooms, beats, rank, and control.</div>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {allNavLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground/80 transition-colors hover:bg-muted/40 hover:text-foreground"
+                  className={`spitzone-nav-link ${link.href === "/app" ? "spitzone-nav-link-active" : ""}`}
                 >
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/55">
                     {link.icon}
                   </span>
                   {link.label}
@@ -108,8 +113,11 @@ export default async function AppLayout({
 
             <Separator className="my-3" />
 
-            <div className="px-2 text-[10px] text-muted-foreground/50">
-              {user.email} | {role}
+            <div className="space-y-3 px-2">
+              <div className="spitzone-chip-live">Live network online</div>
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/42">
+                {user.email} | {role}
+              </div>
             </div>
           </nav>
         </aside>

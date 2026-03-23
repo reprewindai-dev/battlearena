@@ -75,36 +75,42 @@ export function OnboardingChecklist() {
   const nextStep = state.steps.find((step) => !step.complete) ?? state.steps[0];
 
   return (
-    <Card className="border-primary/40 bg-primary/5 p-5 backdrop-blur">
+    <Card className="spitzone-panel border-primary/25 bg-primary/8 p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Onboarding</div>
+            <div className="spitzone-kicker">Onboarding</div>
             <h2 className="mt-1 text-xl font-bold text-foreground">Activate your Spitzone account</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-white/62">
               Complete the real production checklist so battles, monetization, and community loops are live on your account.
             </p>
           </div>
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <div className="flex items-center justify-between text-xs font-medium text-white/52">
               <span>{state.completedSteps} of {state.totalSteps} complete</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2 bg-white/8 [&>div]:bg-[linear-gradient(90deg,#f5d88c_0%,#f3b842_38%,#ff7a1a_74%,#f2447a_100%)]" />
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             {state.steps.map((step) => (
               <Link
                 key={step.id}
                 href={step.href}
-                className={`rounded-xl border p-3 transition-colors ${step.complete ? "border-emerald-500/40 bg-emerald-500/10" : "border-border/70 bg-background/50 hover:border-primary/50 hover:bg-background/80"}`}
+                className={`rounded-[1.2rem] border p-3 transition-colors ${
+                  step.complete
+                    ? "border-primary/20 bg-primary/12"
+                    : "border-white/10 bg-black/20 hover:border-primary/30 hover:bg-black/28"
+                }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold">{step.title}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{step.description}</div>
+                    <div className="text-sm font-semibold text-white">{step.title}</div>
+                    <div className="mt-1 text-xs text-white/54">{step.description}</div>
                   </div>
-                  <div className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${step.complete ? "bg-emerald-500/20 text-emerald-300" : "bg-primary/15 text-primary"}`}>
+                  <div className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] ${
+                    step.complete ? "bg-primary/18 text-primary" : "bg-white/8 text-white/72"
+                  }`}>
                     {step.complete ? "Done" : "Open"}
                   </div>
                 </div>
@@ -113,10 +119,10 @@ export function OnboardingChecklist() {
           </div>
         </div>
         <div className="flex shrink-0 flex-col gap-2">
-          <Button asChild>
+          <Button asChild className="rounded-full bg-primary text-black hover:bg-[#ffd071]">
             <Link href={nextStep.href}>{nextStep.complete ? "Open checklist" : `Start: ${nextStep.title}`}</Link>
           </Button>
-          <Button variant="ghost" onClick={() => void updateState("dismiss")}>
+          <Button variant="ghost" onClick={() => void updateState("dismiss")} className="rounded-full text-white/68 hover:bg-white/8 hover:text-white">
             Dismiss for now
           </Button>
         </div>

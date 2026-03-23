@@ -18,14 +18,14 @@ function StatCard({ icon, label, value, highlight }: {
   highlight?: boolean;
 }) {
   return (
-    <Card className={`border-border/60 bg-card/30 p-4 backdrop-blur ${highlight ? "border-green-500/30 bg-green-500/5" : ""}`}>
+    <Card className={`spitzone-panel p-4 ${highlight ? "border-primary/25 bg-primary/8" : ""}`}>
       <div className="flex items-center gap-3">
-        <div className={`rounded-lg p-2 ${highlight ? "bg-green-500/10" : "bg-muted/20"}`}>
+        <div className={`rounded-xl border p-2 ${highlight ? "border-primary/20 bg-primary/12" : "border-white/10 bg-black/20"}`}>
           {icon}
         </div>
         <div>
-          <div className="text-2xl font-bold tabular-nums">{value.toLocaleString()}</div>
-          <div className="text-xs text-muted-foreground">{label}</div>
+          <div className="text-2xl font-bold tabular-nums text-white">{value.toLocaleString()}</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-white/44">{label}</div>
         </div>
       </div>
     </Card>
@@ -46,7 +46,7 @@ export function CommunityStats() {
     return (
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 animate-pulse rounded-xl bg-muted/30" />
+          <div key={i} className="h-20 animate-pulse rounded-[1.2rem] border border-white/10 bg-black/20" />
         ))}
       </div>
     );
