@@ -11,6 +11,10 @@ on:
         description: Git ref to test
         required: false
         default: main
+      repeat_count:
+        description: Number of back-to-back human battle runs
+        required: false
+        default: "3"
 
 jobs:
   matchmaking-human:
@@ -25,6 +29,7 @@ jobs:
       SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      MATCHMAKING_HUMAN_REPEAT: ${{ inputs.repeat_count }}
 
     steps:
       - name: Checkout

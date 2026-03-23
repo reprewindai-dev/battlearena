@@ -44,6 +44,7 @@ const adminClient = hasAdminEnv
 
 const createdUserIds: string[] = [];
 const createdBattleIds = new Set<string>();
+const repeatCount = Math.max(1, Number(process.env.MATCHMAKING_HUMAN_REPEAT ?? "1"));
 
 function requireAdminClient() {
   if (!adminClient) {
@@ -157,7 +158,7 @@ test.afterAll(async () => {
   if (createdUserIds.length > 0) {
     await adminClient.from("matchmaking_queue").delete().in("user_id", createdUserIds);
     await adminClient.from("users").delete().in("id", createdUserIds);
-    await adminClient.from("user_profiles").delete().in("id", createdUserIds);
+    await adminClient.from("user_profiles").delete().in("user_id", createdUserIds);
     await adminClient.from("user_ratings").delete().in("user_id", createdUserIds);
     await adminClient.from("wallets").delete().in("user_id", createdUserIds);
 
@@ -171,169 +172,179 @@ test.describe("human matchmaking runtime verification", () => {
   test.skip(!hasAdminEnv, "Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
 
   test("two users queue, match, join the same live room, finalize, and can requeue", async ({ browser }) => {
-    test.setTimeout(180_000);
-    const battleFormat = `e2e${Date.now().toString().slice(-8)}`;
+    test.setTimeout(Math.max(180_000, repeatCount * 180_000));
 
-    const userA = await createVerifiedUser("human_match_a");
-    const userB = await createVerifiedUser("human_match_b");
+    for (let run = 0; run < repeatCount; run += 1) {
+      const battleFormat = `e2e${Date.now().toString().slice(-8)}r${run}`;
 
-    const contextA = await browser.newContext();
-    const contextB = await browser.newContext();
-    const pageA = await contextA.newPage();
-    const pageB = await contextB.newPage();
+      const userA = await createVerifiedUser(`human_match_a_${run}`);
+      const userB = await createVerifiedUser(`human_match_b_${run}`);
 
-    await login(pageA, userA);
-    await login(pageB, userB);
+      const contextA = await browser.newContext();
+      const contextB = await browser.newContext();
+      const pageA = await contextA.newPage();
+      const pageB = await contextB.newPage();
 
-    const enqueueA = await browserFetch(pageA, "/api/matchmaking/enqueue", {
-      method: "POST",
-      body: { queueType: "freestyle", battleFormat },
-    });
-    if (!enqueueA.ok) {
-      throw new Error(`enqueue_a_failed:${enqueueA.status}:${JSON.stringify(enqueueA.body)}`);
-    }
-    const enqueueABody = enqueueA.body as MatchmakingBody;
-    expect(enqueueABody.status).toBe("queued");
-    expect(enqueueABody.matched).toBe(false);
-    expect(enqueueABody.battleId).toBeNull();
+      try {
+        await login(pageA, userA);
+        await login(pageB, userB);
 
-    const enqueueB = await browserFetch(pageB, "/api/matchmaking/enqueue", {
-      method: "POST",
-      body: { queueType: "freestyle", battleFormat },
-    });
-    if (!enqueueB.ok) {
-      throw new Error(`enqueue_b_failed:${enqueueB.status}:${JSON.stringify(enqueueB.body)}`);
-    }
-    const enqueueBBody = enqueueB.body as MatchmakingBody;
-    expect(enqueueBBody.status).toBe("matched");
-    expect(enqueueBBody.matched).toBe(true);
-    expect(enqueueBBody.isBotBattle).toBe(false);
-    expect(enqueueBBody.fallbackReason).toBe("none");
-    expect(enqueueBBody.battleId).toBeTruthy();
+        const profileProbeA = await browserFetch(pageA, "/api/profile/me");
+        const profileProbeB = await browserFetch(pageB, "/api/profile/me");
+        expect(profileProbeA.ok).toBeTruthy();
+        expect(profileProbeB.ok).toBeTruthy();
 
-    const battleId = enqueueBBody.battleId as string;
-    createdBattleIds.add(battleId);
-
-    await expect
-      .poll(async () => {
-        const response = await browserFetch(
-          pageA,
-          `/api/matchmaking/status?queueType=freestyle&battleFormat=${encodeURIComponent(battleFormat)}`,
-        );
-        if (!response.ok) {
-          return null;
+        const enqueueA = await browserFetch(pageA, "/api/matchmaking/enqueue", {
+          method: "POST",
+          body: { queueType: "freestyle", battleFormat },
+        });
+        if (!enqueueA.ok) {
+          throw new Error(`enqueue_a_failed:${enqueueA.status}:${JSON.stringify(enqueueA.body)}`);
         }
-        return response.body as MatchmakingBody;
-      }, { timeout: 30_000, intervals: [1000, 2000, 5000] })
-      .toMatchObject({
-        status: "matched",
-        matched: true,
-        battleId,
-        isBotBattle: false,
-        fallbackReason: "none",
-      });
+        const enqueueABody = enqueueA.body as MatchmakingBody;
+        expect(enqueueABody.status).toBe("queued");
+        expect(enqueueABody.matched).toBe(false);
+        expect(enqueueABody.battleId).toBeNull();
 
-    const battleBeforeJoin = await getBattleRow(battleId);
-    expect(battleBeforeJoin.status).toBe("matched");
-    expect(battleBeforeJoin.queue_type).toBe("freestyle");
-    expect(battleBeforeJoin.battle_format).toBe(battleFormat);
-    expect(battleBeforeJoin.is_bot_battle).toBeFalsy();
+        const enqueueB = await browserFetch(pageB, "/api/matchmaking/enqueue", {
+          method: "POST",
+          body: { queueType: "freestyle", battleFormat },
+        });
+        if (!enqueueB.ok) {
+          throw new Error(`enqueue_b_failed:${enqueueB.status}:${JSON.stringify(enqueueB.body)}`);
+        }
+        const enqueueBBody = enqueueB.body as MatchmakingBody;
+        expect(enqueueBBody.status).toBe("matched");
+        expect(enqueueBBody.matched).toBe(true);
+        expect(enqueueBBody.isBotBattle).toBe(false);
+        expect(enqueueBBody.fallbackReason).toBe("none");
+        expect(enqueueBBody.battleId).toBeTruthy();
 
-    const participantsBeforeJoin = await getBattleParticipants(battleId);
-    expect(participantsBeforeJoin).toHaveLength(2);
-    expect(participantsBeforeJoin.map((participant) => participant.user_id).sort()).toEqual([userA.id, userB.id].sort());
+        const battleId = enqueueBBody.battleId as string;
+        createdBattleIds.add(battleId);
 
-    const joinA = await browserFetch(pageA, "/api/battle-session/join", { method: "POST", body: { battleId } });
-    const joinB = await browserFetch(pageB, "/api/battle-session/join", { method: "POST", body: { battleId } });
-    expect(joinA.ok).toBeTruthy();
-    expect(joinB.ok).toBeTruthy();
+        await expect
+          .poll(async () => {
+            const response = await browserFetch(
+              pageA,
+              `/api/matchmaking/status?queueType=freestyle&battleFormat=${encodeURIComponent(battleFormat)}`,
+            );
+            if (!response.ok) {
+              return null;
+            }
+            return response.body as MatchmakingBody;
+          }, { timeout: 30_000, intervals: [1000, 2000, 5000] })
+          .toMatchObject({
+            status: "matched",
+            matched: true,
+            battleId,
+            isBotBattle: false,
+            fallbackReason: "none",
+          });
 
-    await expect
-      .poll(async () => {
-        const battle = await getBattleRow(battleId);
-        return battle.status;
-      }, { timeout: 20_000, intervals: [1000, 2000, 5000] })
-      .toBe("live");
+        const battleBeforeJoin = await getBattleRow(battleId);
+        expect(battleBeforeJoin.status).toBe("matched");
+        expect(battleBeforeJoin.queue_type).toBe("freestyle");
+        expect(battleBeforeJoin.battle_format).toBe(battleFormat);
+        expect(battleBeforeJoin.is_bot_battle).toBeFalsy();
 
-    const tokenProbeA = await browserFetch(pageA, `/api/livekit/token?room=${encodeURIComponent(battleId)}`);
-    const tokenProbeB = await browserFetch(pageB, `/api/livekit/token?room=${encodeURIComponent(battleId)}`);
-    expect(tokenProbeA.ok).toBeTruthy();
-    expect(tokenProbeB.ok).toBeTruthy();
+        const participantsBeforeJoin = await getBattleParticipants(battleId);
+        expect(participantsBeforeJoin).toHaveLength(2);
+        expect(participantsBeforeJoin.map((participant) => participant.user_id).sort()).toEqual([userA.id, userB.id].sort());
 
-    const battleUrl = `/app/battles/room?battleId=${encodeURIComponent(battleId)}`;
-    await pageA.goto(battleUrl);
-    await pageB.goto(battleUrl);
+        const joinA = await browserFetch(pageA, "/api/battle-session/join", { method: "POST", body: { battleId } });
+        const joinB = await browserFetch(pageB, "/api/battle-session/join", { method: "POST", body: { battleId } });
+        expect(joinA.ok).toBeTruthy();
+        expect(joinB.ok).toBeTruthy();
 
-    await expect(pageA.getByTestId("battle-video-production")).toBeVisible();
-    await expect(pageB.getByTestId("battle-video-production")).toBeVisible();
+        await expect
+          .poll(async () => {
+            const battle = await getBattleRow(battleId);
+            return battle.status;
+          }, { timeout: 20_000, intervals: [1000, 2000, 5000] })
+          .toBe("live");
 
-    await pageA.getByTestId("join-room").click();
-    await pageB.getByTestId("join-room").click();
+        const tokenProbeA = await browserFetch(pageA, `/api/livekit/token?room=${encodeURIComponent(battleId)}`);
+        const tokenProbeB = await browserFetch(pageB, `/api/livekit/token?room=${encodeURIComponent(battleId)}`);
+        expect(tokenProbeA.ok).toBeTruthy();
+        expect(tokenProbeB.ok).toBeTruthy();
 
-    await expect(pageA.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(pageB.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+        const battleUrl = `/app/battles/room?battleId=${encodeURIComponent(battleId)}`;
+        await pageA.goto(battleUrl);
+        await pageB.goto(battleUrl);
 
-    await pageA.getByTestId("enable-camera").click();
-    await pageA.getByTestId("enable-mic").click();
-    await pageB.getByTestId("enable-camera").click();
-    await pageB.getByTestId("enable-mic").click();
+        await expect(pageA.getByTestId("battle-video-production")).toBeVisible();
+        await expect(pageB.getByTestId("battle-video-production")).toBeVisible();
 
-    await expect
-      .poll(async () => pageA.getByText(/participants:\s*2/i).count())
-      .toBeGreaterThan(0);
-    await expect
-      .poll(async () => pageB.getByText(/participants:\s*2/i).count())
-      .toBeGreaterThan(0);
+        await pageA.getByTestId("join-room").click();
+        await pageB.getByTestId("join-room").click();
 
-    await pageB.getByRole("button", { name: "Leave Room" }).click();
-    await expect
-      .poll(async () => pageA.getByText(/participants:\s*1/i).count())
-      .toBeGreaterThan(0);
+        await expect(pageA.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+        await expect(pageB.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
 
-    await pageB.getByTestId("join-room").click();
-    await expect
-      .poll(async () => pageA.getByText(/participants:\s*2/i).count())
-      .toBeGreaterThan(0);
+        await pageA.getByTestId("enable-camera").click();
+        await pageA.getByTestId("enable-mic").click();
+        await pageB.getByTestId("enable-camera").click();
+        await pageB.getByTestId("enable-mic").click();
 
-    const client = requireAdminClient();
-    await client
-      .from("battles")
-      .update({
-        voting_closes_at: new Date(Date.now() - 1_000).toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", battleId);
+        await expect
+          .poll(async () => pageA.getByText(/participants:\s*2/i).count())
+          .toBeGreaterThan(0);
+        await expect
+          .poll(async () => pageB.getByText(/participants:\s*2/i).count())
+          .toBeGreaterThan(0);
 
-    const finalizePage = battleBeforeJoin.created_by === userA.id ? pageA : pageB;
-    const finalizeResponse = await browserFetch(finalizePage, "/api/battle-session/finalize", {
-      method: "POST",
-      body: { battleId },
-    });
-    expect(finalizeResponse.ok).toBeTruthy();
+        await pageB.getByRole("button", { name: "Leave Room" }).click();
+        await expect
+          .poll(async () => pageA.getByText(/participants:\s*1/i).count())
+          .toBeGreaterThan(0);
 
-    await expect
-      .poll(async () => {
-        const battle = await getBattleRow(battleId);
-        return battle.result ? "saved" : null;
-      }, { timeout: 20_000, intervals: [1000, 2000, 5000] })
-      .toBe("saved");
+        await pageB.getByTestId("join-room").click();
+        await expect
+          .poll(async () => pageA.getByText(/participants:\s*2/i).count())
+          .toBeGreaterThan(0);
 
-    const requeue = await browserFetch(pageA, "/api/matchmaking/enqueue", {
-      method: "POST",
-      body: { queueType: "freestyle", battleFormat, action: "leave" },
-    });
-    expect(requeue.ok).toBeTruthy();
+        const client = requireAdminClient();
+        await client
+          .from("battles")
+          .update({
+            voting_closes_at: new Date(Date.now() - 1_000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", battleId);
 
-    const requeueAgain = await browserFetch(pageA, "/api/matchmaking/enqueue", {
-      method: "POST",
-      body: { queueType: "freestyle", battleFormat },
-    });
-    expect(requeueAgain.ok).toBeTruthy();
-    const requeueBody = requeueAgain.body as MatchmakingBody;
-    expect(requeueBody.status).toBe("queued");
-    expect(requeueBody.matched).toBe(false);
+        const finalizePage = battleBeforeJoin.created_by === userA.id ? pageA : pageB;
+        const finalizeResponse = await browserFetch(finalizePage, "/api/battle-session/finalize", {
+          method: "POST",
+          body: { battleId },
+        });
+        expect(finalizeResponse.ok).toBeTruthy();
 
-    await contextA.close();
-    await contextB.close();
+        await expect
+          .poll(async () => {
+            const battle = await getBattleRow(battleId);
+            return battle.result ? "saved" : null;
+          }, { timeout: 20_000, intervals: [1000, 2000, 5000] })
+          .toBe("saved");
+
+        const requeue = await browserFetch(pageA, "/api/matchmaking/enqueue", {
+          method: "POST",
+          body: { queueType: "freestyle", battleFormat, action: "leave" },
+        });
+        expect(requeue.ok).toBeTruthy();
+
+        const requeueAgain = await browserFetch(pageA, "/api/matchmaking/enqueue", {
+          method: "POST",
+          body: { queueType: "freestyle", battleFormat },
+        });
+        expect(requeueAgain.ok).toBeTruthy();
+        const requeueBody = requeueAgain.body as MatchmakingBody;
+        expect(requeueBody.status).toBe("queued");
+        expect(requeueBody.matched).toBe(false);
+      } finally {
+        await contextA.close();
+        await contextB.close();
+      }
+    }
   });
 });
