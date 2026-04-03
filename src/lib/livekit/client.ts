@@ -30,6 +30,10 @@ export class BattleLiveKitClient {
   private onStateChanged?: (state: ConnectionState) => void;
   private onError?: (message: string) => void;
 
+  private isSpectatorIdentity(identity: string | undefined) {
+    return typeof identity === "string" && identity.startsWith("spectator:");
+  }
+
   constructor() {
     this.room = new Room({
       adaptiveStream: true,
@@ -232,6 +236,10 @@ export class BattleLiveKitClient {
 
   private attachFirstRemoteVideoTrack() {
     for (const participant of this.room.remoteParticipants.values()) {
+      if (this.isSpectatorIdentity(participant.identity)) {
+        continue;
+      }
+
       const publication = Array.from(participant.trackPublications.values()).find(
         (p: RemoteTrackPublication) => p.kind === Track.Kind.Video && p.track,
       );
@@ -264,12 +272,16 @@ export class BattleLiveKitClient {
   }
 
   private notifyParticipantsChanged() {
-    const participants = Array.from(this.room.remoteParticipants.values());
+    const participants = Array.from(this.room.remoteParticipants.values()).filter(
+      (participant) => !this.isSpectatorIdentity(participant.identity),
+    );
     this.onParticipantsChanged?.(participants);
   }
 
   getParticipants(): RemoteParticipant[] {
-    return Array.from(this.room.remoteParticipants.values());
+    return Array.from(this.room.remoteParticipants.values()).filter(
+      (participant) => !this.isSpectatorIdentity(participant.identity),
+    );
   }
 
   isConnected(): boolean {

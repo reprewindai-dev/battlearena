@@ -105,7 +105,7 @@ test.afterAll(async () => {
 
 test("auth flow renders", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Walk back into the room/i })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
   await expect(page.getByRole("button", { name: "Login" })).toBeVisible();
@@ -113,7 +113,7 @@ test("auth flow renders", async ({ page }) => {
 
 test("signup page renders", async ({ page }) => {
   await page.goto("/signup");
-  await expect(page.getByRole("heading", { name: "Sign up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Claim your identity before the crowd gets here/i })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
   await expect(page.getByRole("button", { name: "Create account" })).toBeVisible();

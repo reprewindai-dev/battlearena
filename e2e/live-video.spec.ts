@@ -96,14 +96,18 @@ test("two authenticated users can publish and observe live video state", async (
 
   const userA = await createVerifiedUser("video_a");
   const userB = await createVerifiedUser("video_b");
+  const spectator = await createVerifiedUser("video_spectator");
 
   const contextA = await browser.newContext();
   const contextB = await browser.newContext();
+  const contextSpectator = await browser.newContext();
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
+  const spectatorPage = await contextSpectator.newPage();
 
   await login(pageA, userA);
   await login(pageB, userB);
+  await login(spectatorPage, spectator);
 
   const createResponse = await pageA.request.post("/api/battle-session");
   if (!createResponse.ok()) {
@@ -133,19 +137,38 @@ test("two authenticated users can publish and observe live video state", async (
   if (!tokenProbeB.ok()) {
     throw new Error(`token_probe_b_failed:${tokenProbeB.status()}:${await tokenProbeB.text()}`);
   }
+  const spectatorTokenProbe = await spectatorPage.request.get(
+    `/api/livekit/token?room=${encodeURIComponent(battleId)}`,
+  );
+  if (!spectatorTokenProbe.ok()) {
+    throw new Error(
+      `token_probe_spectator_failed:${spectatorTokenProbe.status()}:${await spectatorTokenProbe.text()}`,
+    );
+  }
+  const spectatorTokenBody = (await spectatorTokenProbe.json()) as { role?: string; participant?: string };
+  expect(spectatorTokenBody.role).toBe("spectator");
+  expect(spectatorTokenBody.participant).toContain(`spectator:${spectator.id}:`);
 
   const battleUrl = `/app/battles/room?battleId=${encodeURIComponent(battleId)}`;
   await pageA.goto(battleUrl);
   await pageB.goto(battleUrl);
+  await spectatorPage.goto(battleUrl);
 
   await expect(pageA.getByTestId("battle-video-production")).toBeVisible();
   await expect(pageB.getByTestId("battle-video-production")).toBeVisible();
+  await expect(spectatorPage.getByTestId("battle-video-production")).toBeVisible();
+  await expect(spectatorPage.getByRole("button", { name: "Watch Room" })).toBeVisible();
+  await expect(spectatorPage.getByTestId("enable-camera")).toBeDisabled();
+  await expect(spectatorPage.getByTestId("enable-mic")).toBeDisabled();
 
   await pageA.getByTestId("join-room").click();
   await pageB.getByTestId("join-room").click();
+  await spectatorPage.getByTestId("join-room").click();
 
   await expect(pageA.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(pageB.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(spectatorPage.getByText("connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(spectatorPage.getByTestId("spectator-mode-banner")).toBeVisible();
 
   await pageA.getByTestId("enable-camera").click();
   await pageA.getByTestId("enable-mic").click();
@@ -160,6 +183,11 @@ test("two authenticated users can publish and observe live video state", async (
   await expect
     .poll(async () => {
       return pageB.getByText(/participants:\s*2/i).count();
+    })
+    .toBeGreaterThan(0);
+  await expect
+    .poll(async () => {
+      return spectatorPage.getByText(/participants:\s*2/i).count();
     })
     .toBeGreaterThan(0);
 
@@ -179,4 +207,5 @@ test("two authenticated users can publish and observe live video state", async (
 
   await contextA.close();
   await contextB.close();
+  await contextSpectator.close();
 });

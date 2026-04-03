@@ -48,8 +48,15 @@ export async function GET(request: NextRequest) {
   }
   logContext.user_id = user.id;
 
-  // Participant identity is always bound to authenticated user to prevent token spoofing.
-  const participant = user.id;
+  if (requestedParticipant && requestedParticipant !== user.id && requestedParticipant !== "spectator") {
+    logStructured("warn", "livekit_token_requested_participant_mismatch", logContext, {
+      requested_participant: requestedParticipant,
+    });
+    return withRequestId(
+      NextResponse.json({ error: "requested_participant_mismatch" }, { status: 403 }),
+      logContext.request_id,
+    );
+  }
 
   const { data: battle, error: battleError } = await supabase
     .from("battles")
@@ -92,22 +99,27 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   const viewerRole = getRole({ isParticipant: Boolean(participantRow) || battle.created_by === user.id });
-  if (viewerRole === "spectator") {
+  if (viewerRole === "spectator" && battle.status !== "matched" && battle.status !== "live") {
     await getTelemetrySystem()
       .emitEvent({
         event_type: "LIVEKIT_TOKEN_FAILED",
         player_id: user.id,
         match_id: room,
-        event_data: { reason: "not_participant" },
+        event_data: { reason: "spectator_not_allowed_for_status", battle_status: battle.status },
       })
       .catch(() => null);
 
-    logStructured("warn", "livekit_token_not_participant", logContext);
+    logStructured("warn", "livekit_token_spectator_not_allowed_for_status", logContext, {
+      battle_status: battle.status,
+    });
     return withRequestId(
-      NextResponse.json({ error: "not_participant" }, { status: 403 }),
+      NextResponse.json({ error: "spectator_not_allowed_for_status" }, { status: 403 }),
       logContext.request_id,
     );
   }
+
+  // Participant identity is always bound to authenticated user to prevent token spoofing.
+  const participant = viewerRole === "participant" ? user.id : `spectator:${user.id}:${room}`;
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -148,8 +160,8 @@ export async function GET(request: NextRequest) {
       room,
       roomJoin: true,
       canSubscribe: true,
-      canPublish: true,
-      canPublishData: true,
+      canPublish: viewerRole === "participant",
+      canPublishData: viewerRole === "participant",
     });
     const jwt = await token.toJwt();
 

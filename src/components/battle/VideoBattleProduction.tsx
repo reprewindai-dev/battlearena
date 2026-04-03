@@ -16,6 +16,7 @@ interface VideoBattleProductionProps {
   battleStatus?: string | null;
   isBotBattle?: boolean;
   mmrNeutral?: boolean;
+  accessRole?: "participant" | "spectator" | "moderator";
   onStreamReady?: (stream: MediaStream) => void;
 }
 
@@ -26,6 +27,7 @@ export function VideoBattleProduction({
   battleStatus,
   isBotBattle = false,
   mmrNeutral = false,
+  accessRole = "participant",
   onStreamReady,
 }: VideoBattleProductionProps) {
   const client = useMemo(() => new BattleLiveKitClient(), []);
@@ -146,6 +148,11 @@ export function VideoBattleProduction({
   }
 
   async function toggleCamera() {
+    if (accessRole === "spectator") {
+      setError("spectator_publish_disabled");
+      return;
+    }
+
     if (isCameraEnabled) {
       await client.disableCamera();
       setIsCameraEnabled(false);
@@ -163,6 +170,11 @@ export function VideoBattleProduction({
   }
 
   async function toggleMicrophone() {
+    if (accessRole === "spectator") {
+      setError("spectator_publish_disabled");
+      return;
+    }
+
     if (isMicEnabled) {
       await client.disableMicrophone();
       setIsMicEnabled(false);
@@ -176,12 +188,16 @@ export function VideoBattleProduction({
   }
 
   const connected = connectionState === "connected";
+  const canPublish = accessRole !== "spectator";
+  const displayedParticipantCount = participantsCount + (accessRole === "spectator" ? 0 : 1);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-testid="battle-video-production">
       <Card className="p-4 border-border/60 bg-card/40 backdrop-blur">
         <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-medium">Local (Slot {localSlot})</div>
+          <div className="text-sm font-medium">
+            {accessRole === "spectator" ? "Viewer" : `Local (Slot ${localSlot})`}
+          </div>
           <Badge variant={connected ? "default" : "secondary"}>{connectionState}</Badge>
         </div>
 
@@ -203,7 +219,7 @@ export function VideoBattleProduction({
         <div className="mt-3 flex flex-wrap gap-2">
           {!connected ? (
             <Button onClick={connectToRoom} disabled={isConnecting} data-testid="join-room">
-              {isConnecting ? "Connecting..." : "Join Room"}
+              {isConnecting ? "Connecting..." : accessRole === "spectator" ? "Watch Room" : "Join Room"}
             </Button>
           ) : (
             <Button variant="destructive" onClick={disconnectFromRoom}>
@@ -214,7 +230,7 @@ export function VideoBattleProduction({
           <Button
             variant={isCameraEnabled ? "default" : "outline"}
             onClick={toggleCamera}
-            disabled={!connected}
+            disabled={!connected || !canPublish}
             data-testid="enable-camera"
           >
             {isCameraEnabled ? "Disable Camera" : "Enable Camera"}
@@ -223,7 +239,7 @@ export function VideoBattleProduction({
           <Button
             variant={isMicEnabled ? "default" : "outline"}
             onClick={toggleMicrophone}
-            disabled={!connected}
+            disabled={!connected || !canPublish}
             data-testid="enable-mic"
           >
             {isMicEnabled ? "Disable Mic" : "Enable Mic"}
@@ -245,6 +261,12 @@ export function VideoBattleProduction({
           </div>
         ) : null}
 
+        {accessRole === "spectator" ? (
+          <div className="mb-3 text-xs text-muted-foreground" data-testid="spectator-mode-banner">
+            Watch-only mode. Spectators can subscribe to live video but cannot publish camera or microphone.
+          </div>
+        ) : null}
+
         <div className="relative aspect-video rounded-lg bg-black overflow-hidden">
           <video
             ref={remoteVideoRef}
@@ -260,7 +282,7 @@ export function VideoBattleProduction({
         </div>
 
         <div className="mt-3 text-xs text-muted-foreground">
-          participants: <span className="font-mono text-foreground">{participantsCount + 1}</span>
+          participants: <span className="font-mono text-foreground">{displayedParticipantCount}</span>
         </div>
 
         {error ? <div className="mt-2 text-xs text-amber-200/90">{error}</div> : null}

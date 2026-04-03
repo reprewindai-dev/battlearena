@@ -35,6 +35,7 @@ type BattleSession = {
   created_at: string | null;
   can_manage?: boolean;
   viewer_role?: string | null;
+  viewer_access?: "participant" | "spectator" | "moderator";
   is_bot_battle?: boolean;
   fallback_reason?: string | null;
   wait_time_ms?: number | null;
@@ -141,9 +142,17 @@ export async function GET(req: Request) {
   });
 
   const isParticipant = hydratedParticipants.some((participant) => participant.user_id === user.id);
-  if (!isParticipant && battle.created_by !== user.id && !isModOrAdmin(role)) {
+  const canModerate = isModOrAdmin(role);
+  const isSpectatableBattle =
+    battle.status === "matched" || battle.status === "live" || battle.status === "complete";
+  const isCreator = battle.created_by === user.id;
+
+  if (!isParticipant && !isCreator && !canModerate && !isSpectatableBattle) {
     return NextResponse.json({ error: "not_participant" }, { status: 403 });
   }
+
+  const viewerAccess: BattleSession["viewer_access"] =
+    isParticipant || isCreator ? "participant" : canModerate ? "moderator" : "spectator";
 
   const session: BattleSession = {
     id: battle.id,
@@ -160,8 +169,9 @@ export async function GET(req: Request) {
     voting_closes_at: (battle as { voting_closes_at?: string | null }).voting_closes_at ?? null,
     result: (battle as { result?: unknown | null }).result ?? null,
     created_at: battle.created_at,
-    can_manage: battle.created_by === user.id || isModOrAdmin(role),
+    can_manage: isCreator || canModerate,
     viewer_role: role,
+    viewer_access: viewerAccess,
     is_bot_battle: Boolean((battle as { is_bot_battle?: boolean | null }).is_bot_battle),
     fallback_reason: (battle as { fallback_reason?: string | null }).fallback_reason ?? null,
     wait_time_ms: (battle as { wait_time_ms?: number | null }).wait_time_ms ?? null,

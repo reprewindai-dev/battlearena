@@ -45,6 +45,7 @@ type BattleSessionMetadata = {
   created_at: string | null;
   can_manage?: boolean;
   viewer_role?: string | null;
+  viewer_access?: "participant" | "spectator" | "moderator";
   current_round?: number | null;
   voting_opened_at?: string | null;
   voting_closes_at?: string | null;
@@ -435,8 +436,13 @@ export function BattleRoomCockpit() {
   const slotA = sessionMeta?.participants?.find((p) => p.slot === 1) ?? null;
   const slotB = sessionMeta?.participants?.find((p) => p.slot === 2) ?? null;
   const viewerUserId = sessionMeta?.viewer_user_id ?? viewerUserIdFallback;
+  const isViewerParticipant =
+    Boolean(viewerUserId) && (slotA?.user_id === viewerUserId || slotB?.user_id === viewerUserId);
+  const isViewerModerator = sessionMeta?.viewer_access === "moderator";
+  const isViewerSpectator = sessionMeta?.viewer_access === "spectator";
+  const canUseParticipantControls = isViewerParticipant || isViewerModerator;
   const localSlot = slotA?.user_id === viewerUserId ? 1 : slotB?.user_id === viewerUserId ? 2 : 1;
-  const showJoinAsB = Boolean(sessionId && !slotB);
+  const showJoinAsB = Boolean(sessionId && !slotB && !isViewerParticipant);
   const battleTypeLabel = sessionMeta?.battle_type
     ? sessionMeta.battle_type.replace(/_/g, " ")
     : sessionMeta?.queue_type
@@ -1320,6 +1326,7 @@ export function BattleRoomCockpit() {
           battleStatus={sessionMeta?.status ?? null}
           isBotBattle={Boolean(sessionMeta?.is_bot_battle)}
           mmrNeutral={Boolean(sessionMeta?.mmr_neutral)}
+          accessRole={sessionMeta?.viewer_access ?? "participant"}
           onStreamReady={async (stream) => {
             // Check video session limit before tracking
             const canUseVideo = await checkUsageLimit("video_session");
@@ -1391,9 +1398,16 @@ export function BattleRoomCockpit() {
             <Separator className="my-4" />
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => setBeatModalOpen(true)}>
+              <Button
+                variant="outline"
+                onClick={() => setBeatModalOpen(true)}
+                disabled={!canUseParticipantControls}
+              >
                 Choose Beat
               </Button>
+              {isViewerSpectator ? (
+                <div className="text-xs text-muted-foreground">Watch-only access.</div>
+              ) : null}
               <Button
                 onClick={() => setBeatPlaying((p) => !p)}
                 disabled={!currentBeat}
@@ -1449,7 +1463,7 @@ export function BattleRoomCockpit() {
                   <Button
                     variant="outline"
                     onClick={enableMic}
-                    disabled={micStatus === "requesting" || micStatus === "unsupported"}
+                    disabled={!canUseParticipantControls || micStatus === "requesting" || micStatus === "unsupported"}
                   >
                     {micStatus === "requesting" ? "Requesting..." : "Enable Mic"}
                   </Button>
@@ -1463,14 +1477,14 @@ export function BattleRoomCockpit() {
 
                 <Button
                   onClick={startRecording}
-                  disabled={!canRecord || micStatus !== "granted"}
+                  disabled={!canUseParticipantControls || !canRecord || micStatus !== "granted"}
                 >
                   Record
                 </Button>
                 <Button
                   variant="outline"
                   onClick={stopRecording}
-                  disabled={!canStop}
+                  disabled={!canUseParticipantControls || !canStop}
                 >
                   Stop
                 </Button>
@@ -1502,7 +1516,9 @@ export function BattleRoomCockpit() {
                 <div className="ml-auto text-xs text-muted-foreground">
                   {isClient && (
                     <>
-                      {isSupabaseMode && isUploadingRecording
+                      {!canUseParticipantControls
+                        ? "Watch only"
+                        : isSupabaseMode && isUploadingRecording
                         ? "Uploading..."
                         : micStatus === "unsupported"
                           ? "Unsupported"
