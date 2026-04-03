@@ -95,6 +95,7 @@ Recent workflow hardening completed:
 - manual Render live video action exists at `.github/workflows/render-live-video.yml`
 - manual Render matchmaking bot action exists at `.github/workflows/render-matchmaking-bot.yml`
 - manual Render beats runtime action exists at `.github/workflows/render-beats-runtime.yml`
+- manual Render recordings runtime action exists at `.github/workflows/render-recordings-runtime.yml`
 - manual Render tournaments runtime action exists at `.github/workflows/render-tournaments-runtime.yml`
 - automated two-user live battle video verification has passed against Render in prior verified runs
 - automated timed bot fallback verification has passed against Render for:
