@@ -11,6 +11,13 @@ type Credentials = {
   password: string;
 };
 
+type AppRole = "user" | "mod";
+
+type StorageObjectRef = {
+  bucket: string;
+  path: string;
+};
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const hasRecordingsEnv = Boolean(supabaseUrl && serviceRoleKey);
@@ -22,6 +29,7 @@ const adminClient = hasRecordingsEnv
 const createdUserIds: string[] = [];
 const createdBattleIds: string[] = [];
 const createdRecordingIds: string[] = [];
+const createdStorageObjects: StorageObjectRef[] = [];
 
 function requireAdminClient() {
   if (!adminClient) {
@@ -34,7 +42,7 @@ function randomSuffix() {
   return `${Date.now()}_${Math.floor(Math.random() * 1_000_000)}`;
 }
 
-async function createVerifiedUser(prefix: string): Promise<Credentials> {
+async function createVerifiedUser(prefix: string, role: AppRole = "user"): Promise<Credentials> {
   const client = requireAdminClient();
   const email = `${prefix}_${randomSuffix()}@battlearena-e2e.local`;
   const password = `E2E_${randomSuffix()}_Strong!`;
@@ -43,6 +51,8 @@ async function createVerifiedUser(prefix: string): Promise<Credentials> {
     email,
     password,
     email_confirm: true,
+    app_metadata: { role },
+    user_metadata: { role },
   });
 
   if (error || !data.user) {
@@ -73,11 +83,21 @@ async function setBattleStatus(request: APIRequestContext, battleId: string, sta
 test.afterAll(async () => {
   if (!adminClient) return;
 
+  for (const objectRef of createdStorageObjects) {
+    try {
+      await adminClient.storage.from(objectRef.bucket).remove([objectRef.path]);
+    } catch {
+      // best-effort cleanup
+    }
+  }
+
   if (createdRecordingIds.length > 0) {
     await adminClient.from("battle_recordings").delete().in("id", createdRecordingIds);
   }
 
   if (createdBattleIds.length > 0) {
+    await adminClient.from("battle_messages").delete().in("battle_id", createdBattleIds);
+    await adminClient.from("battle_votes").delete().in("battle_id", createdBattleIds);
     await adminClient.from("battle_participants").delete().in("battle_id", createdBattleIds);
     await adminClient.from("battles").delete().in("id", createdBattleIds);
   }
@@ -85,6 +105,7 @@ test.afterAll(async () => {
   if (createdUserIds.length > 0) {
     await adminClient.from("matchmaking_queue").delete().in("user_id", createdUserIds);
     await adminClient.from("users").delete().in("id", createdUserIds);
+    await adminClient.from("user_profiles").delete().in("user_id", createdUserIds);
     for (const userId of createdUserIds) {
       await adminClient.auth.admin.deleteUser(userId);
     }
@@ -139,6 +160,7 @@ test("participant can upload finalize list and download recordings after battle 
     token: string;
   };
   createdRecordingIds.push(uploadInitBody.recordingId);
+  createdStorageObjects.push({ bucket: uploadInitBody.bucket, path: uploadInitBody.path });
 
   const { error: uploadError } = await requireAdminClient()
     .storage
@@ -200,4 +222,101 @@ test("participant can upload finalize list and download recordings after battle 
   expect(signedAssetResponse.ok()).toBeTruthy();
 
   await context.close();
+});
+
+test("moderators can list and download participant recordings without joining the battle", async ({ browser }) => {
+  test.setTimeout(180_000);
+  test.skip(!hasRecordingsEnv, "Requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+
+  const owner = await createVerifiedUser("recordings_owner");
+  const moderator = await createVerifiedUser("recordings_mod", "mod");
+  const outsider = await createVerifiedUser("recordings_outsider");
+
+  const ownerContext = await browser.newContext();
+  const moderatorContext = await browser.newContext();
+  const outsiderContext = await browser.newContext();
+  const ownerPage = await ownerContext.newPage();
+  const moderatorPage = await moderatorContext.newPage();
+  const outsiderPage = await outsiderContext.newPage();
+
+  await login(ownerPage, owner);
+  await login(moderatorPage, moderator);
+  await login(outsiderPage, outsider);
+
+  const createResponse = await ownerPage.request.post("/api/battle-session");
+  if (!createResponse.ok()) {
+    throw new Error(`battle_create_failed:${createResponse.status()}:${await createResponse.text()}`);
+  }
+  const createBody = (await createResponse.json()) as { battleId?: string };
+  const battleId = createBody.battleId;
+  if (!battleId) throw new Error("battle_create_missing_id");
+  createdBattleIds.push(battleId);
+
+  await setBattleStatus(ownerPage.request, battleId, "live");
+  await setBattleStatus(ownerPage.request, battleId, "complete");
+
+  const bucket = "battle-recordings";
+  const path = `${battleId}/${owner.id}/mod-access-${randomSuffix()}.webm`;
+  const audioBytes = Buffer.from(`spitzone-mod-recording-${randomSuffix()}`, "utf8");
+  createdStorageObjects.push({ bucket, path });
+
+  const { error: storageError } = await requireAdminClient().storage.from(bucket).upload(path, audioBytes, {
+    contentType: "audio/webm",
+    upsert: false,
+  });
+  if (storageError) {
+    throw new Error(`recording_seed_upload_failed:${storageError.message}`);
+  }
+
+  const { data: recordingRows, error: recordingError } = await requireAdminClient()
+    .from("battle_recordings")
+    .insert({
+      battle_id: battleId,
+      created_by: owner.id,
+      storage_bucket: bucket,
+      storage_path: path,
+      mime_type: "audio/webm",
+      duration_seconds: 9,
+      bytes: audioBytes.byteLength,
+      uploaded_at: new Date().toISOString(),
+    })
+    .select("id")
+    .limit(1);
+
+  if (recordingError || !recordingRows?.[0]?.id) {
+    throw new Error(`recording_seed_insert_failed:${recordingError?.message ?? "unknown"}`);
+  }
+
+  const recordingId = recordingRows[0].id as string;
+  createdRecordingIds.push(recordingId);
+
+  const moderatorListResponse = await moderatorPage.request.get(
+    `/api/battle-session/recordings?battleId=${encodeURIComponent(battleId)}`,
+  );
+  expect(moderatorListResponse.ok()).toBeTruthy();
+
+  const moderatorListBody = (await moderatorListResponse.json()) as {
+    ok: true;
+    recordings: Array<{ id: string }>;
+  };
+  expect(moderatorListBody.recordings.some((recording) => recording.id === recordingId)).toBeTruthy();
+
+  const moderatorDownloadResponse = await moderatorPage.request.get(
+    `/api/battle-session/recordings/download?recordingId=${encodeURIComponent(recordingId)}`,
+  );
+  expect(moderatorDownloadResponse.ok()).toBeTruthy();
+
+  const outsiderListResponse = await outsiderPage.request.get(
+    `/api/battle-session/recordings?battleId=${encodeURIComponent(battleId)}`,
+  );
+  expect(outsiderListResponse.status()).toBe(403);
+
+  const outsiderDownloadResponse = await outsiderPage.request.get(
+    `/api/battle-session/recordings/download?recordingId=${encodeURIComponent(recordingId)}`,
+  );
+  expect(outsiderDownloadResponse.status()).toBe(403);
+
+  await ownerContext.close();
+  await moderatorContext.close();
+  await outsiderContext.close();
 });

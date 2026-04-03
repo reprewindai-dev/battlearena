@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getSessionUser } from "@/lib/auth/session";
+import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { loadBattleAccess } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -34,7 +34,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
   }
 
-  const access = await loadBattleAccess({ supabase, battleId, userId: user.id, role: "user" });
+  const role = await getSessionRole();
+  const access = await loadBattleAccess({ supabase, battleId, userId: user.id, role });
   if (!access) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -102,7 +103,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const access = await loadBattleAccess({ supabase, battleId, userId: authData.user.id, role: "user" });
+  const role = await getSessionRole();
+  const access = await loadBattleAccess({ supabase, battleId, userId: authData.user.id, role });
   if (!access) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
