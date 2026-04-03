@@ -37,7 +37,8 @@
     "test:e2e:recordings-runtime": "playwright test e2e/recordings-runtime.spec.ts -c playwright.config.mts",
     "test:e2e:tournaments-runtime": "playwright test e2e/tournaments-runtime.spec.ts -c playwright.config.mts",
     "test:e2e:stripe-runtime": "playwright test e2e/stripe-runtime.spec.ts -c playwright.config.mts",
-    "test:e2e:stripe-live-smoke": "playwright test e2e/stripe-live-smoke.spec.ts -c playwright.config.mts"
+    "test:e2e:stripe-live-smoke": "playwright test e2e/stripe-live-smoke.spec.ts -c playwright.config.mts",
+    "test:e2e:battle-access-runtime": "playwright test e2e/battle-access-runtime.spec.ts -c playwright.config.mts"
   },
   "dependencies": {
     "@radix-ui/react-progress": "^1.1.8",

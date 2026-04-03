@@ -37,6 +37,25 @@ export function isTerminalBattleStatus(status: string | null | undefined) {
   return status === "complete" || status === "canceled";
 }
 
+export function isSpectatableBattleStatus(status: string | null | undefined) {
+  return status === "matched" || status === "live" || status === "complete";
+}
+
+export function canViewBattle(params: {
+  battle: Pick<BattleAccessRow, "status" | "created_by">;
+  userId: string;
+  isParticipant: boolean;
+  canModerate: boolean;
+}) {
+  const { battle, userId, isParticipant, canModerate } = params;
+  return (
+    isParticipant ||
+    battle.created_by === userId ||
+    canModerate ||
+    isSpectatableBattleStatus(battle.status)
+  );
+}
+
 export function canTransitionBattleStatus(
   currentStatus: string | null | undefined,
   nextStatus: BattleLifecycleStatus,

@@ -1,6 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 import { getSessionUser } from "@/lib/auth/session";
+import { canViewBattle, loadBattleAccess, type SessionRole } from "@/lib/battle/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type ApiMessage = {
@@ -9,6 +10,10 @@ type ApiMessage = {
   body: string;
   ts: number;
 };
+
+function parseSessionRole(rawRole: string | null): SessionRole {
+  return rawRole === "admin" || rawRole === "mod" || rawRole === "user" ? rawRole : null;
+}
 
 export async function GET(req: Request) {
   const user = await getSessionUser();
@@ -25,6 +30,48 @@ export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const rawRole =
+    (authData.user.app_metadata as { role?: string } | undefined)?.role ??
+    (authData.user.user_metadata as { role?: string } | undefined)?.role ??
+    null;
+  const role = parseSessionRole(rawRole);
+
+  let access;
+  try {
+    access = await loadBattleAccess({
+      supabase,
+      battleId,
+      userId: authData.user.id,
+      role,
+      select: "id,created_by,status",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "battle_access_failed", details: error instanceof Error ? error.message : "unknown" },
+      { status: 400 },
+    );
+  }
+
+  if (!access) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  if (
+    !canViewBattle({
+      battle: access.battle,
+      userId: authData.user.id,
+      isParticipant: access.isParticipant,
+      canModerate: access.canModerate,
+    })
+  ) {
+    return NextResponse.json({ error: "not_participant" }, { status: 403 });
   }
 
   const { data: rows, error } = await supabase
@@ -69,7 +116,10 @@ export async function GET(req: Request) {
     for (const p of profiles ?? []) {
       if (p.user_id) {
         const existing = profilesById.get(p.user_id);
-        profilesById.set(p.user_id, { handle: existing?.handle ?? null, display_name: (p as { display_name?: string | null }).display_name ?? null });
+        profilesById.set(p.user_id, {
+          handle: existing?.handle ?? null,
+          display_name: (p as { display_name?: string | null }).display_name ?? null,
+        });
       }
     }
   }
@@ -116,6 +166,43 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const rawRole =
+    (authData.user.app_metadata as { role?: string } | undefined)?.role ??
+    (authData.user.user_metadata as { role?: string } | undefined)?.role ??
+    null;
+  const role = parseSessionRole(rawRole);
+
+  let access;
+  try {
+    access = await loadBattleAccess({
+      supabase,
+      battleId,
+      userId: authData.user.id,
+      role,
+      select: "id,created_by,status",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "battle_access_failed", details: error instanceof Error ? error.message : "unknown" },
+      { status: 400 },
+    );
+  }
+
+  if (!access) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  if (
+    !canViewBattle({
+      battle: access.battle,
+      userId: authData.user.id,
+      isParticipant: access.isParticipant,
+      canModerate: access.canModerate,
+    })
+  ) {
+    return NextResponse.json({ error: "not_participant" }, { status: 403 });
+  }
+
   const { error } = await supabase.from("battle_messages").insert({
     battle_id: battleId,
     created_by: authData.user.id,
@@ -128,4 +215,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, mode: "supabase" });
 }
-

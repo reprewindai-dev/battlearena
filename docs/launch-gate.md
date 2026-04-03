@@ -93,6 +93,7 @@ Recent workflow hardening completed:
 - `CodeQL` passes on current `main`
 - manual Render smoke action exists at `.github/workflows/render-live-smoke.yml`
 - manual Render live video action exists at `.github/workflows/render-live-video.yml`
+- manual Render battle access runtime action exists at `.github/workflows/render-battle-access-runtime.yml`
 - manual Render matchmaking bot action exists at `.github/workflows/render-matchmaking-bot.yml`
 - manual Render beats runtime action exists at `.github/workflows/render-beats-runtime.yml`
 - manual Render recordings runtime action exists at `.github/workflows/render-recordings-runtime.yml`
