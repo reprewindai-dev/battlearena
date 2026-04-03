@@ -232,6 +232,31 @@ export function BattleRoomCockpit() {
     };
   }, [autoCreateEnabled, router, searchParams, setStoredSession, storedBattleId, storedMode]);
 
+  const reloadSessionMeta = React.useCallback(async () => {
+    if (!sessionId) {
+      setSessionMeta(null);
+      setSessionMetaError(null);
+      return;
+    }
+    try {
+      const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
+      const res = await fetch(url, { method: "GET" });
+      const body = (await res.json()) as
+        | { ok: true; mode: "supabase"; session: BattleSessionMetadata }
+        | { error: string; details?: string };
+      if (!res.ok || !("ok" in body)) {
+        setSessionMeta(null);
+        setSessionMetaError("Unable to load battle metadata.");
+        return;
+      }
+      setSessionMeta(body.session);
+      setSessionMetaError(null);
+    } catch {
+      setSessionMeta(null);
+      setSessionMetaError("Unable to load battle metadata.");
+    }
+  }, [sessionId]);
+
   React.useEffect(() => {
     let cancelled = false;
     async function loadMeta() {
@@ -240,22 +265,18 @@ export function BattleRoomCockpit() {
         setSessionMetaError(null);
         return;
       }
-
       try {
         const url = `/api/battle-session?battleId=${encodeURIComponent(sessionId)}`;
         const res = await fetch(url, { method: "GET" });
         const body = (await res.json()) as
           | { ok: true; mode: "supabase"; session: BattleSessionMetadata }
           | { error: string; details?: string };
-
         if (cancelled) return;
-
         if (!res.ok || !("ok" in body)) {
           setSessionMeta(null);
           setSessionMetaError("Unable to load battle metadata.");
           return;
         }
-
         setSessionMeta(body.session);
         setSessionMetaError(null);
       } catch {
@@ -264,7 +285,6 @@ export function BattleRoomCockpit() {
         setSessionMetaError("Unable to load battle metadata.");
       }
     }
-
     void loadMeta();
     return () => {
       cancelled = true;
@@ -800,6 +820,18 @@ export function BattleRoomCockpit() {
           void reloadRecordings();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "battles",
+          filter: `id=eq.${sessionId}`,
+        },
+        () => {
+          void reloadSessionMeta();
+        },
+      )
       .subscribe();
 
     realtimeChannelRef.current = channel;
@@ -813,7 +845,7 @@ export function BattleRoomCockpit() {
         // ignore
       }
     };
-  }, [isSupabaseMode, reloadMessages, reloadRecordings, reloadVotes, sessionId, viewerUserId]);
+  }, [isSupabaseMode, reloadMessages, reloadRecordings, reloadSessionMeta, reloadVotes, sessionId, viewerUserId]);
 
   React.useEffect(() => {
     if (!isSupabaseMode || !sessionId) return;
@@ -1730,31 +1762,43 @@ export function BattleRoomCockpit() {
                       </Button>
                     </div>
 
+                    {(() => {
+                      const total = voteA + voteB;
+                      const pctA = total > 0 ? Math.round((voteA / total) * 100) : 50;
+                      const pctB = 100 - pctA;
+                      return (
+                        <div className="space-y-1">
+                          <div className="flex overflow-hidden rounded-full" style={{ height: 8 }}>
+                            <div
+                              className="bg-primary transition-all duration-500"
+                              style={{ width: `${pctA}%` }}
+                            />
+                            <div
+                              className="bg-secondary transition-all duration-500"
+                              style={{ width: `${pctB}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>A {pctA}%</span>
+                            <span>{total} vote{total !== 1 ? "s" : ""}</span>
+                            <span>B {pctB}%</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {voteError ? <div className="text-xs text-amber-200/90">{voteError}</div> : null}
 
                     {votingClosed ? (
                       <div className="text-xs text-muted-foreground">Voting is closed for this round.</div>
                     ) : null}
 
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs text-muted-foreground">
-                        {hasVoted
-                          ? `Vote submitted${myVote ? ` (you voted ${myVote === 1 ? "A" : "B"})` : ""}`
-                          : votingClosed
-                            ? "Voting is closed"
-                            : "You can vote once"}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (isSupabaseMode) return;
-                          setHasVoted(false);
-                        }}
-                        disabled={isSupabaseMode}
-                      >
-                        Reset (dev)
-                      </Button>
+                    <div className="text-xs text-muted-foreground">
+                      {hasVoted
+                        ? `Vote submitted${myVote ? ` · you voted ${myVote === 1 ? "A" : "B"}` : ""}`
+                        : votingClosed
+                          ? "Voting is closed"
+                          : "You can vote once"}
                     </div>
                   </div>
                 </>

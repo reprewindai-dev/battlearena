@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   if (!access.isParticipant || row.created_by !== authData.user.id) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
-  if (access.battle.status === "complete" || access.battle.status === "canceled") {
+  if (access.battle.status === "canceled") {
     return NextResponse.json({ error: "battle_not_recordable" }, { status: 409 });
   }
 
