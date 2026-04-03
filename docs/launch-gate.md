@@ -70,8 +70,6 @@ Static verification completed on the current codebase:
 
 Recent runtime verification completed:
 - Render production health endpoint returns `ok`
-- Render production commit is currently verified live:
-  - `a0dedf998a44bd3cf5e8d60b174f97969c390615`
 - Health response currently reports dependencies healthy:
   - `supabase: true`
   - `livekit: true`
@@ -84,7 +82,7 @@ Recent runtime verification completed:
   - `/app/battles/pvp` redirects to room
   - `/app/battles/bot-room/[battleId]` redirects to room with `battleId`
 - Matched battles promote to `live` on room join instead of remaining stuck in `matched`
-- Live Render smoke suite passes unauthenticated paths against production:
+- Live Render smoke suite has passed against production in prior verified runs:
   - `4 passed`
   - `4 skipped`
 
@@ -98,26 +96,23 @@ Recent workflow hardening completed:
 - manual Render matchmaking bot action exists at `.github/workflows/render-matchmaking-bot.yml`
 - manual Render beats runtime action exists at `.github/workflows/render-beats-runtime.yml`
 - manual Render tournaments runtime action exists at `.github/workflows/render-tournaments-runtime.yml`
-- automated two-user live battle video verification passed against Render via GitHub Actions
-- automated timed bot fallback verification passed against Render for:
+- automated two-user live battle video verification has passed against Render in prior verified runs
+- automated timed bot fallback verification has passed against Render for:
   - freestyle bot fallback contract
   - ranked MMR-neutral bot fallback contract
-- automated beat runtime verification passed against Render for:
+- automated beat runtime verification has passed against Render for:
   - admin-only upload enforcement
   - storage-backed beat persistence
   - beat library visibility
   - public asset fetchability for audio and preview URLs
-- automated tournament runtime verification passed against Render for:
+- automated tournament runtime verification has passed against Render for:
   - admin-created tournament registration flow
   - canonical `user_profiles.token_balance` debit on entry
   - duplicate registration does not double-charge
 - tournament registration is now enforced by atomic database RPC:
   - `register_tournament_participant_runtime`
   - participant insert and token debit occur inside the same database transaction
-- automated tournament runtime verification passed again against the atomic route on current `main`:
-  - workflow run `23371271264`
-  - commit `a0dedf998a44bd3cf5e8d60b174f97969c390615`
-- automated Stripe runtime verification passed against Render for:
+- automated Stripe runtime verification has passed against Render for:
   - token purchase webhook reconciliation into `payment_ledger`
   - token balance/profile reconciliation after purchase
   - subscription webhook reconciliation into `user_billing_profiles`
@@ -128,24 +123,25 @@ Recent workflow hardening completed:
 
 ## Blocked Or Not Yet Fully Proven
 These items are not signed off yet:
-- none
+- current live deployment version must match the repo commit under test
 
 ## Current Risks
 Open launch risks that must be cleared before calling the build 100 percent complete:
 - older status documents in the repo should not be treated as stronger proof than this launch gate
 
 ## Release Gate Status
-Current gate: `GREEN`
+Current gate: `CONDITIONAL`
 
 Meaning:
-- code compiles, builds, deploys, and serves production traffic
-- workflow health is green on the current repo baseline
-- critical checkout/runtime defects have been removed
-- production launch requirements tracked in this file are verified on the current deployed commit
+- code compiles, builds, and has prior successful live verification evidence
+- critical checkout/runtime defects have been removed from the repo baseline
+- production is only considered green when `/api/health.version` matches the exact commit under test
+- a stale Render deployment is a launch blocker even if dependency checks remain green
 
 ## Exit Criteria For Green
 The gate turns green only when all of the following are complete:
 - latest GitHub Actions CI and security workflows pass on current `main`
+- Render runtime verification workflows fail on deployment-version mismatch
 - production Render environment includes all required vars
 - real two-user battle flow is verified end to end
 - timed bot fallback is verified end to end for casual and ranked paths
@@ -153,3 +149,4 @@ The gate turns green only when all of the following are complete:
 - tournament token debit/refund path is verified against canonical profile balance
 - storage-backed beat upload and playback are verified in production
 - no remaining high-severity launch blockers are open
+

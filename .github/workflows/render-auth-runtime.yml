@@ -45,9 +45,9 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Verify deployment health
-        run: |
-          curl --fail --silent --show-error "$PLAYWRIGHT_BASE_URL/api/health"
+      - name: Verify deployment health and version
+        run: ./.github/scripts/verify-render-health.sh "$PLAYWRIGHT_BASE_URL"
 
       - name: Run auth runtime suite
         run: npm run test:e2e:auth-runtime
+
