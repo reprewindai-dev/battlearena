@@ -907,7 +907,7 @@ export function BattleRoomCockpit() {
     }
   }
 
-  const lastRecordingMetaPostedRef = React.useRef<string | null>(null);
+  const lastUploadedRecordingBlobRef = React.useRef<Blob | null>(null);
   React.useEffect(() => {
     let cancelled = false;
 
@@ -925,9 +925,8 @@ export function BattleRoomCockpit() {
 
     async function uploadRecording() {
       if (!recordingBlob || !sessionId || !isSupabaseMode) return;
-      const key = `${recordingBlob.size}:${recordingBlob.type}:${recordingSeconds}:${sessionId}`;
-      if (lastRecordingMetaPostedRef.current === key) return;
-      lastRecordingMetaPostedRef.current = key;
+      if (lastUploadedRecordingBlobRef.current === recordingBlob) return;
+      lastUploadedRecordingBlobRef.current = recordingBlob;
 
       setRecordingUploadError(null);
       setIsUploadingRecording(true);
@@ -957,6 +956,7 @@ export function BattleRoomCockpit() {
           | { error: string; details?: string };
 
         if (!initRes.ok || !("ok" in initBody)) {
+          lastUploadedRecordingBlobRef.current = null;
           setRecordingUploadError("Unable to initialize upload.");
           return;
         }
@@ -966,6 +966,7 @@ export function BattleRoomCockpit() {
           supabase = createSupabaseBrowserClient();
         } catch {
           await cleanupRecording(initBody.recordingId);
+          lastUploadedRecordingBlobRef.current = null;
           setRecordingUploadError("Supabase is not configured.");
           return;
         }
@@ -976,6 +977,7 @@ export function BattleRoomCockpit() {
 
         if (uploadError) {
           await cleanupRecording(initBody.recordingId);
+          lastUploadedRecordingBlobRef.current = null;
           setRecordingUploadError("Upload failed.");
           return;
         }
@@ -988,6 +990,7 @@ export function BattleRoomCockpit() {
 
         if (!finalizeRes.ok) {
           await cleanupRecording(initBody.recordingId);
+          lastUploadedRecordingBlobRef.current = null;
           setRecordingUploadError("Upload failed.");
           return;
         }
@@ -996,6 +999,7 @@ export function BattleRoomCockpit() {
         setLatestRecordingId(initBody.recordingId);
         await reloadRecordings();
       } catch {
+        lastUploadedRecordingBlobRef.current = null;
         setRecordingUploadError("Upload failed.");
       } finally {
         setIsUploadingRecording(false);
@@ -1145,6 +1149,7 @@ export function BattleRoomCockpit() {
       URL.revokeObjectURL(recordingUrl);
       setRecordingUrl(null);
     }
+    lastUploadedRecordingBlobRef.current = null;
     setRecordingBlob(null);
     chunksRef.current = [];
 

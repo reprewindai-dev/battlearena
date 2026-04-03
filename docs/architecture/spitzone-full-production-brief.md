@@ -152,7 +152,7 @@ Current battle capabilities include:
 - battle history
 - recent sessions
 - real-time session metadata refresh
-- LiveKit token issuance for valid participants
+- LiveKit token issuance for valid battle viewers
 
 Battle modes currently represented in the system:
 - freestyle
@@ -176,8 +176,8 @@ The media layer is currently LiveKit-backed for battle participation.
 
 Current live session rules:
 - only authenticated users can request tokens
-- only participants or battle owners can receive join tokens
-- spectators are explicitly blocked from participant tokens in the current route
+- participants receive publish/subscribe tokens
+- authorized spectators receive subscribe-only tokens for matched/live battles
 - token issuance and failure are tracked in telemetry
 
 This gives Spitzone a real low-latency battle transport foundation, not a fake demo room.
