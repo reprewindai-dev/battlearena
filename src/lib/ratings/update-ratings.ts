@@ -64,20 +64,24 @@ async function savePlayerRating(
 
   // Increment wins/losses separately via RPC-safe increment pattern
   const incrementField = isWin ? "wins" : "losses";
-  await client.rpc("increment_user_rating_stat" as string, {
-    p_user_id: userId,
-    p_field: incrementField,
-  }).catch(() => null); // Non-critical if RPC doesn't exist yet
+  try {
+    await client.rpc("increment_user_rating_stat" as string, {
+      p_user_id: userId,
+      p_field: incrementField,
+    });
+  } catch { /* Non-critical if RPC doesn't exist yet */ }
 
   // Save to rating history
-  await client.from("rating_history").insert({
-    user_id: userId,
-    rating: updated.rating,
-    rating_deviation: updated.rd,
-    volatility: updated.volatility,
-    tier: newTier,
-    reference_battle_id: battleId,
-  }).catch(() => null);
+  try {
+    await client.from("rating_history").insert({
+      user_id: userId,
+      rating: updated.rating,
+      rating_deviation: updated.rd,
+      volatility: updated.volatility,
+      tier: newTier,
+      reference_battle_id: battleId,
+    });
+  } catch { /* Non-critical */ }
 }
 
 /**
