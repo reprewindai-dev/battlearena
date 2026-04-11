@@ -108,7 +108,7 @@ export function Leaderboard() {
           <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 bg-muted/20 px-4 py-2 text-xs font-medium text-muted-foreground">
             <span>Rank</span>
             <span>Player</span>
-            <span className="text-right">ELO</span>
+            <span className="text-right">Rating</span>
             <span className="text-right">W/L</span>
             <span className="text-right">WR%</span>
           </div>

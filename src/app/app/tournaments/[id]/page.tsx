@@ -1,13 +1,14 @@
 ﻿import { notFound } from "next/navigation";
 import Link from "next/link";
 
-import { getSessionUser } from "@/lib/auth/session";
+import { getSessionRole, getSessionUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { TournamentRegisterButton } from "@/components/community/TournamentRegisterButton";
+import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Calendar, Clock, Trophy, Users, Zap } from "lucide-react";
 
 type Tournament = {
@@ -90,6 +91,8 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const [, sessionRole] = await Promise.all([getSessionUser(), getSessionRole()]);
+  const isAdmin = sessionRole === "admin";
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return <div className="p-8 text-center text-sm text-muted-foreground">Database not configured.</div>;
@@ -286,6 +289,20 @@ export default async function TournamentDetailPage({
           </div>
         )}
       </div>
+
+      {(tournament.status === "live" || tournament.status === "completed") && (
+        <>
+          <Separator className="border-border/40" />
+          <TournamentBracket tournamentId={id} isAdmin={isAdmin} />
+        </>
+      )}
+
+      {isAdmin && ["registration", "upcoming"].includes(tournament.status) && (
+        <>
+          <Separator className="border-border/40" />
+          <TournamentBracket tournamentId={id} isAdmin={true} />
+        </>
+      )}
     </div>
   );
 }

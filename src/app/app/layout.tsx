@@ -15,6 +15,8 @@ const NAV_LINKS = [
   { href: "/app/leaderboard", label: "Leaderboard", icon: "LB" },
   { href: "/app/tournaments", label: "Tournaments", icon: "TN" },
   { href: "/app/challenges", label: "Challenges", icon: "CH" },
+  { href: "/app/governance", label: "Governance", icon: "GV" },
+  { href: "/app/economy", label: "Wallet", icon: "WL" },
   { href: "/app/shop", label: "Shop", icon: "SH" },
   { href: "/app/profile", label: "My Profile", icon: "PF" },
   { href: "/app/battles/history", label: "Battle History", icon: "BH" },

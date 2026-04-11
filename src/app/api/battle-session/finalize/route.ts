@@ -6,6 +6,7 @@ import { markReferralActivated } from "@/lib/growth/referrals";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
+import { applyPostBattleUpdates } from "@/lib/ratings/update-ratings";
 
 export async function POST(req: Request) {
   const user = await getSessionUser();
@@ -151,6 +152,26 @@ export async function POST(req: Request) {
     ...result,
     rating_deltas: eloData?.elo ?? null,
   };
+
+  // Apply Glicko-2 ratings and economy rewards (non-blocking)
+  try {
+    const typedParticipants = (participants ?? []) as Array<{ user_id?: string | null; slot?: number }>;
+    const winnerParticipantForRating = winnerSlot
+      ? typedParticipants.find((p) => p.slot === winnerSlot)
+      : null;
+    const loserParticipantForRating = winnerSlot
+      ? typedParticipants.find((p) => p.slot !== winnerSlot && (p.slot === 1 || p.slot === 2))
+      : null;
+
+    void applyPostBattleUpdates({
+      battleId,
+      winnerUserId: winnerParticipantForRating?.user_id ?? null,
+      loserUserId: loserParticipantForRating?.user_id ?? null,
+      isBotBattle: Boolean(access.battle.is_bot_battle),
+    });
+  } catch {
+    // Non-critical
+  }
 
   try {
     const winnerParticipant = winnerSlot
