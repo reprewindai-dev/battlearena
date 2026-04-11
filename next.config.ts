@@ -16,7 +16,11 @@ const nextConfig: NextConfig = {
     "http://127.0.0.1:3000",
     "http://localhost:3000",
     "*.replit.dev",
+    "*.replit.app",
     "*.repl.co",
+    "*.worf.replit.dev",
+    "*.kirk.replit.dev",
+    "*.picard.replit.dev",
   ],
 };
 
