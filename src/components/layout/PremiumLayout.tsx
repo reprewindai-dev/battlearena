@@ -63,33 +63,44 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-black/90 backdrop-blur-lg lg:hidden">
+      {/* MOBILE HEADER - STREET STYLE */}
+      <header className="fixed left-0 right-0 top-0 z-50 border-b-2 border-red-500/30 bg-black/95 backdrop-blur-lg lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <BattleArenaLogo size="small" />
-            <BattleArenaWordmark size="small" />
+            <span className="graffiti-text text-xl text-white">
+              BATTLE <span className="text-red-500">ARENA</span>
+            </span>
           </div>
           <button
             onClick={() => setMobileMenuOpen((open) => !open)}
-            className="rounded-lg bg-white/10 p-2 transition-colors hover:bg-white/20"
+            className="rounded-lg bg-red-500/20 border border-red-500/30 p-2 transition-colors hover:bg-red-500/30"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {mobileMenuOpen ? <X className="h-5 w-5 text-red-400" /> : <Menu className="h-5 w-5 text-red-400" />}
           </button>
         </div>
       </header>
 
-      <header className="fixed left-0 right-0 top-0 z-50 hidden border-b border-white/10 bg-black/90 backdrop-blur-lg lg:block">
-        <div className="container mx-auto px-6 py-4">
+      {/* DESKTOP HEADER - STREET STYLE */}
+      <header className="fixed left-0 right-0 top-0 z-50 hidden border-b-2 border-red-500/30 bg-black/95 backdrop-blur-lg lg:block">
+        <div className="container mx-auto px-6 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <BattleArenaLogo size="medium" />
-              <BattleArenaWordmark size="medium" />
+            {/* Logo */}
+            <div className="flex items-center gap-3">
+              <span className="graffiti-text text-2xl text-white">
+                BATTLE <span className="text-red-500">ARENA</span>
+              </span>
             </div>
 
-            <nav className="hidden items-center gap-6 lg:flex">
+            {/* Navigation */}
+            <nav className="hidden items-center gap-1 lg:flex">
               {appNavigation.map(({ href, label, icon: Icon }) => (
-                <Button key={href} asChild variant="ghost" className="flex items-center gap-2 text-white hover:bg-white/10">
+                <Button 
+                  key={href} 
+                  asChild 
+                  variant="ghost" 
+                  className="flex items-center gap-2 text-white/80 hover:text-white hover:bg-white/5 uppercase tracking-wider text-sm font-bold"
+                >
                   <Link href={href}>
                     <Icon className="h-4 w-4" />
                     {label}
@@ -98,13 +109,18 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
               ))}
             </nav>
 
-            <div className="flex items-center gap-4">
-              <Button asChild className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-                <Link href="/app/battles">Enter Battle</Link>
+            {/* Actions */}
+            <div className="flex items-center gap-3">
+              <Button asChild className="btn-aggressive px-6 py-2">
+                <Link href="/app/battles">ENTER ARENA</Link>
               </Button>
-              <Button asChild variant="ghost" className="h-auto rounded-full p-0">
+              <Button 
+                asChild 
+                variant="ghost" 
+                className="h-10 w-10 rounded-full border-2 border-red-500/30 p-0 hover:border-red-500 hover:bg-red-500/10"
+              >
                 <Link href="/app/profile" aria-label="Open profile">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-r from-purple-400 to-pink-400" />
+                  <User className="h-5 w-5" />
                 </Link>
               </Button>
             </div>
@@ -112,21 +128,28 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </header>
 
+      {/* MOBILE MENU OVERLAY - STREET STYLE */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-lg lg:hidden">
-          <div className="flex h-full flex-col px-6 pb-6 pt-20">
-            <nav className="flex flex-col gap-4">
+        <div className="fixed inset-0 z-40 bg-black/98 backdrop-blur-xl lg:hidden">
+          <div className="flex h-full flex-col px-6 pb-6 pt-24">
+            {/* Menu Title */}
+            <div className="mb-8">
+              <h2 className="graffiti-text text-4xl text-white mb-2">MENU</h2>
+              <div className="h-1 w-24 bg-gradient-to-r from-red-500 to-yellow-500" />
+            </div>
+            
+            <nav className="flex flex-col gap-2">
               {[...appNavigation, { href: "/app/profile", label: "Profile", icon: User }].map(
                 ({ href, label, icon: Icon }) => (
                   <Button
                     key={href}
                     asChild
                     variant="ghost"
-                    className="justify-start text-white hover:bg-white/10"
+                    className="justify-start text-white hover:text-red-400 hover:bg-red-500/10 py-4 text-lg uppercase tracking-wider font-bold"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Link href={href}>
-                      <Icon className="mr-3 h-4 w-4" />
+                      <Icon className="mr-4 h-6 w-6 text-red-400" />
                       {label}
                     </Link>
                   </Button>
@@ -135,8 +158,12 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
             </nav>
 
             <div className="mt-auto">
-              <Button asChild className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600">
-                <Link href="/app/battles">Enter Battle</Link>
+              <Button 
+                asChild 
+                className="w-full btn-aggressive py-6 text-xl"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Link href="/app/battles">ENTER THE ARENA</Link>
               </Button>
             </div>
           </div>
@@ -145,14 +172,20 @@ export const PremiumLayout: React.FC<LayoutProps> = ({ children }) => {
 
       <main className="lg:pt-20">{children}</main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-black/90 backdrop-blur-lg lg:hidden">
-        <div className="flex items-center justify-around py-2">
+      {/* MOBILE BOTTOM NAV - TIKTOK STYLE */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t-2 border-red-500/20 bg-black/95 backdrop-blur-lg lg:hidden safe-area-pb">
+        <div className="flex items-center justify-around py-1">
           {[...appNavigation, { href: "/app/profile", label: "Profile", icon: User }].map(
             ({ href, label, icon: Icon }) => (
-              <Button key={href} asChild variant="ghost" className="flex flex-col gap-1 p-2 text-white hover:bg-white/10">
+              <Button 
+                key={href} 
+                asChild 
+                variant="ghost" 
+                className="flex flex-col gap-0.5 p-2 text-white/60 hover:text-red-400 hover:bg-red-500/10"
+              >
                 <Link href={href}>
-                  <Icon className="h-5 w-5" />
-                  <span className="text-xs">{label}</span>
+                  <Icon className="h-6 w-6" />
+                  <span className="text-[10px] uppercase tracking-wider font-bold">{label}</span>
                 </Link>
               </Button>
             ),
@@ -269,133 +302,228 @@ export const PremiumHomePage: React.FC = () => {
 
   return (
     <PremiumLayout>
-      <section className="relative">
-        <HeroBanner />
-      </section>
-
-      <section className="container mx-auto px-4 py-8 lg:px-6">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {statCards.map((stat) => (
-            <Card key={stat.label} className={`bg-gradient-to-br ${stat.classes}`}>
-              <CardContent className="p-4 text-center lg:p-6">
-                <div className="mb-2 flex items-center justify-center">{stat.icon}</div>
-                <div className={`text-2xl font-bold lg:text-3xl ${stat.classes.split(" ").at(-1)}`}>{stat.value}</div>
-                <div className="text-sm text-white/60">{stat.label}</div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* AGGRESSIVE HERO SECTION */}
+      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/50 to-black" />
+          <div className="absolute top-0 left-0 w-full h-full opacity-20">
+            <div className="absolute top-20 left-10 w-72 h-72 bg-red-600 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-20 right-10 w-96 h-96 bg-green-500 rounded-full blur-[150px] animate-pulse delay-1000" />
+          </div>
+        </div>
+        
+        {/* Main hero content */}
+        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
+          <div className="live-indicator mb-6 mx-auto w-fit">
+            <span className="text-sm font-bold tracking-widest text-red-400">LIVE BATTLES HAPPENING NOW</span>
+          </div>
+          
+          <h1 className="graffiti-title mb-4" data-text="BATTLE ARENA">
+            BATTLE ARENA
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-gray-300 mb-2 font-bold tracking-wide">
+            STEP INTO THE RING
+          </p>
+          <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
+            Real freestyle rap battles. Real beats. Real competition. 
+            Prove you got bars or get eaten alive.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              asChild 
+              className="btn-aggressive px-8 py-6 text-xl"
+            >
+              <Link href="/app/battles">ENTER THE ARENA</Link>
+            </Button>
+            <Button 
+              asChild 
+              variant="outline" 
+              className="neon-border-green px-8 py-6 text-xl bg-transparent hover:bg-green-500/10"
+            >
+              <Link href="/app/beats">BROWSE BEATS</Link>
+            </Button>
+          </div>
+          
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-4 mt-12 max-w-lg mx-auto">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-500 neon-red">{stats.activeBattles}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider">Active</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-green-500 neon-green">{stats.beatsInLibrary}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider">Beats</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl font-bold text-yellow-500 neon-yellow">{stats.activeBattlers}</div>
+              <div className="text-xs text-gray-400 uppercase tracking-wider">Battlers</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center pt-2">
+            <div className="w-1 h-2 bg-white/60 rounded-full" />
+          </div>
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-8 lg:px-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white lg:text-3xl">
-            Featured <span className="bg-gradient-to-r from-orange-400 to-pink-400 bg-clip-text text-transparent">Battles</span>
+      {/* TIKTOK-STYLE BATTLE FEED */}
+      <section className="container mx-auto px-4 py-12 lg:px-6">
+        <div className="mb-8">
+          <h2 className="graffiti-text text-4xl md:text-5xl mb-2">
+            <span className="text-red-500">LIVE</span> BATTLES
           </h2>
-          <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
-            <Link href="/app/battles">View All</Link>
-          </Button>
+          <p className="text-gray-400">Jump in or watch the carnage unfold</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        {/* AGGRESSIVE BATTLE CARDS GRID */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {featuredBattles.length === 0 ? (
-            <Card className="col-span-full border-white/10 bg-gradient-to-br from-purple-900/20 to-orange-900/20">
-              <CardContent className="p-6 text-white/70">No live or queued battles are available right now.</CardContent>
-            </Card>
+            <div className="col-span-full battle-card p-8 text-center">
+              <p className="text-gray-400 text-lg">THE ARENA IS QUIET...</p>
+              <p className="text-gray-500 text-sm mt-2">Be the first to start a battle</p>
+              <Button asChild className="btn-aggressive mt-6">
+                <Link href="/app/battles">START BATTLE</Link>
+              </Button>
+            </div>
           ) : (
             featuredBattles.map((battle) => (
-              <Card
+              <div
                 key={battle.id}
-                className="border-white/10 bg-gradient-to-br from-purple-900/20 to-orange-900/20 transition-all hover:border-white/20"
+                className="battle-card group cursor-pointer"
+                onClick={() => router.push(`/app/battles/room?battleId=${encodeURIComponent(battle.id)}`)}
               >
-                <CardContent className="p-6">
-                  <div className="mb-4 flex items-center justify-between">
-                    <Badge className={battle.status === "active" ? "bg-orange-500 text-white" : "bg-slate-700 text-white"}>
-                      {battle.status.toUpperCase()}
-                    </Badge>
+                <div className="p-5">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <Video className="h-4 w-4 text-red-400" />
-                      <span className="text-sm font-bold text-red-400">{battle.battle_type.toUpperCase()}</span>
+                      <Badge
+                        className={
+                          battle.battle_type === "ranked"
+                            ? "bg-red-500/20 text-red-400 border-red-500 neon-border"
+                            : battle.battle_type === "tournament"
+                              ? "bg-purple-500/20 text-purple-400 border-purple-500"
+                              : "bg-green-500/20 text-green-400 border-green-500 neon-border-green"
+                        }
+                      >
+                        {battle.battle_type.toUpperCase()}
+                      </Badge>
+                      <span className="text-xs text-gray-500 font-mono">{battle.format}</span>
+                    </div>
+                    {battle.status === "active" && (
+                      <div className="live-indicator">
+                        <span className="text-xs font-bold">LIVE</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VS Section */}
+                  <div className="flex items-center justify-center gap-4 my-6">
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-2xl font-bold">
+                        ?
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">WAITING</p>
+                    </div>
+                    <div className="vs-text">VS</div>
+                    <div className="text-center">
+                      <div className="w-16 h-16 rounded bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-2xl font-bold">
+                        ?
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">WAITING</p>
                     </div>
                   </div>
 
-                  <h3 className="mb-2 text-xl font-bold text-white">{battle.title}</h3>
-
-                  <div className="mb-4 flex items-center justify-between text-sm text-white/70">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{battle.format}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      <span>{battle.viewers} watching</span>
-                    </div>
+                  {/* Footer */}
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
+                    <span className="text-sm text-gray-400">{battle.viewers} watching</span>
+                    <Button 
+                      className="btn-aggressive text-sm px-4 py-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/app/battles/room?battleId=${encodeURIComponent(battle.id)}`);
+                      }}
+                    >
+                      {battle.status === "active" ? "WATCH" : "JOIN"}
+                    </Button>
                   </div>
-
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="text-sm text-white/60">Entry</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-bold text-yellow-400">{battle.entry_fee_tokens}</span>
-                      <span className="text-sm text-white/60">tokens</span>
-                    </div>
-                  </div>
-
-                  <Button
-                    className="w-full bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
-                    onClick={() => router.push(`/app/battles/room?battleId=${encodeURIComponent(battle.id)}`)}
-                  >
-                    {battle.status === "active" ? "Watch Battle" : "Join Battle"}
-                  </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))
           )}
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-8 lg:px-6">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-white lg:text-3xl">
-            Trending <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Beats</span>
+      {/* TRENDING BEATS - STREET STYLE */}
+      <section className="container mx-auto px-4 py-12 lg:px-6">
+        <div className="mb-8">
+          <h2 className="graffiti-text text-4xl md:text-5xl mb-2">
+            <span className="text-yellow-500">HOT</span> BEATS
           </h2>
-          <Button asChild variant="outline" className="border-white/20 text-white hover:bg-white/10">
-            <Link href="/app/beats">Browse All</Link>
-          </Button>
+          <p className="text-gray-400">Fire instrumentals waiting for your bars</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {trendingBeats.length === 0 ? (
-            <Card className="col-span-full border-white/10 bg-gradient-to-br from-purple-900/20 to-pink-900/20">
-              <CardContent className="p-6 text-white/70">No beats are available right now.</CardContent>
-            </Card>
+            <div className="col-span-full battle-card p-8 text-center">
+              <p className="text-gray-400 text-lg">NO BEATS LOADED</p>
+              <p className="text-gray-500 text-sm mt-2">Check back later for fresh drops</p>
+            </div>
           ) : (
             trendingBeats.map((beat) => (
-              <Button
+              <div
                 key={beat.id}
-                variant="ghost"
-                className="h-auto p-0 hover:bg-transparent"
+                className="battle-card cursor-pointer group"
                 onClick={() => router.push("/app/beats")}
               >
-                <Card className="w-full cursor-pointer border-white/10 bg-gradient-to-br from-purple-900/20 to-pink-900/20 text-left transition-all hover:border-white/20">
-                  <CardContent className="p-4">
-                    <div className="mb-3 flex h-24 w-full items-center justify-center rounded-lg bg-gradient-to-br from-orange-400 to-pink-400">
-                      <Mic className="h-8 w-8 text-white/80" />
-                    </div>
-                    <h4 className="mb-1 text-sm font-bold text-white">{beat.title}</h4>
-                    <p className="mb-2 text-xs text-white/60">{beat.artist}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-orange-400">{beat.tempo} BPM</span>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3 text-green-400" />
-                        <span className="text-xs text-green-400">{beat.usage_count} uses</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Button>
+                <div className="p-4">
+                  {/* Visualizer placeholder */}
+                  <div className="mb-4 h-24 w-full bg-gradient-to-t from-gray-800 to-gray-700 flex items-end justify-center gap-1 pb-2 rounded overflow-hidden">
+                    {[...Array(12)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-2 bg-gradient-to-t from-green-500 to-yellow-400 rounded-t"
+                        style={{
+                          height: `${20 + Math.random() * 60}%`,
+                          animation: `pulse ${0.5 + Math.random() * 0.5}s ease-in-out infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  
+                  <h4 className="text-sm font-bold text-white truncate">{beat.title}</h4>
+                  <p className="text-xs text-gray-500 mb-2">{beat.artist}</p>
+                  
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-green-400 font-mono">{beat.tempo} BPM</span>
+                    <span className="text-yellow-400">{beat.usage_count} USES</span>
+                  </div>
+                </div>
+              </div>
             ))
           )}
         </div>
+      </section>
+
+      {/* FOOTER CTA */}
+      <section className="container mx-auto px-4 py-16 text-center">
+        <h2 className="graffiti-text text-5xl md:text-7xl mb-4">
+          YOU <span className="text-red-500">READY</span>?
+        </h2>
+        <p className="text-gray-400 mb-8 max-w-xl mx-auto">
+          The mic is waiting. The crowd is watching. Step up or step aside.
+        </p>
+        <Button 
+          asChild 
+          className="btn-aggressive px-12 py-8 text-2xl"
+        >
+          <Link href="/app/battles">ENTER THE ARENA</Link>
+        </Button>
       </section>
     </PremiumLayout>
   );

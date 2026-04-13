@@ -10,6 +10,7 @@
   --font-sans: var(--font-space-grotesk);
   --font-mono: var(--font-jetbrains-mono);
   --font-display: var(--font-bebas-neue);
+  --font-graffiti: var(--font-permanent-marker);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,31 +50,40 @@
 }
 
 :root {
-  --radius: 1rem;
-  --background: oklch(0.14 0.014 275);
-  --foreground: oklch(0.96 0.01 85);
-  --card: oklch(0.19 0.018 275);
-  --card-foreground: oklch(0.96 0.01 85);
-  --popover: oklch(0.18 0.02 275);
-  --popover-foreground: oklch(0.97 0.01 85);
-  --primary: oklch(0.74 0.18 58);
-  --primary-foreground: oklch(0.14 0.014 275);
-  --secondary: oklch(0.26 0.03 280);
-  --secondary-foreground: oklch(0.95 0.01 85);
-  --muted: oklch(0.23 0.014 275);
-  --muted-foreground: oklch(0.74 0.012 85);
-  --accent: oklch(0.52 0.17 334);
-  --accent-foreground: oklch(0.97 0.01 85);
-  --destructive: oklch(0.62 0.23 25);
-  --border: oklch(0.31 0.025 280);
-  --input: oklch(0.28 0.018 278);
-  --ring: oklch(0.74 0.18 58);
-  --chart-1: oklch(0.74 0.18 58);
-  --chart-2: oklch(0.68 0.14 230);
-  --chart-3: oklch(0.62 0.2 334);
-  --chart-4: oklch(0.8 0.13 145);
-  --chart-5: oklch(0.71 0.13 300);
-  --sidebar: oklch(0.17 0.018 275);
+  --radius: 0.5rem;
+  --background: #0a0a0a;
+  --foreground: #ffffff;
+  --card: #141414;
+  --card-foreground: #ffffff;
+  --popover: #1a1a1a;
+  --popover-foreground: #ffffff;
+  --primary: #ff3a3a;
+  --primary-foreground: #000000;
+  --secondary: #00ff88;
+  --secondary-foreground: #000000;
+  --muted: #1f1f1f;
+  --muted-foreground: #888888;
+  --accent: #ffdd00;
+  --accent-foreground: #000000;
+  --destructive: #ff0040;
+  --border: #333333;
+  --input: #2a2a2a;
+  --ring: #ff3a3a;
+  --chart-1: #ff3a3a;
+  --chart-2: #00ff88;
+  --chart-3: #ffdd00;
+  --chart-4: #ff00ff;
+  --chart-5: #00ffff;
+  --sidebar: #0f0f0f;
+
+  /* Street culture neon accents */
+  --neon-red: #ff3a3a;
+  --neon-green: #00ff88;
+  --neon-yellow: #ffdd00;
+  --neon-magenta: #ff00ff;
+  --neon-cyan: #00ffff;
+  --gritty-gray: #2a2a2a;
+  --concrete: #1a1a1a;
 }
 
 @layer base {
@@ -81,102 +91,229 @@
     @apply border-border;
   }
   html {
-    background:
-      radial-gradient(circle at top, rgba(255, 186, 44, 0.14), transparent 26%),
-      radial-gradient(circle at 80% 0%, rgba(234, 63, 127, 0.16), transparent 22%),
-      linear-gradient(180deg, #080809 0%, #0d0d12 48%, #13111b 100%);
-    background-color: #0a090d;
+    background: #0a0a0a;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     background:
-      radial-gradient(circle at top, rgba(255, 186, 44, 0.08), transparent 28%),
-      radial-gradient(circle at 100% 0%, rgba(234, 63, 127, 0.08), transparent 24%),
-      linear-gradient(180deg, rgba(10, 9, 13, 0.98) 0%, rgba(12, 11, 18, 1) 100%);
+      radial-gradient(circle at 20% 0%, rgba(255, 58, 58, 0.15), transparent 40%),
+      radial-gradient(circle at 80% 0%, rgba(0, 255, 136, 0.1), transparent 35%),
+      radial-gradient(circle at 50% 100%, rgba(255, 221, 0, 0.08), transparent 50%),
+      linear-gradient(180deg, #0a0a0a 0%, #111111 50%, #0a0a0a 100%);
     min-height: 100vh;
+    position: relative;
+  }
+
+  /* Gritty noise texture overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.03;
+    pointer-events: none;
+    z-index: 9999;
   }
 }
 
-/* Premium Component Styles */
+/* Street Culture Component Styles */
 @layer components {
-  .spitzone-display {
-    font-family: var(--font-display), sans-serif;
-    letter-spacing: 0.08em;
+  /* Graffiti text style */
+  .graffiti-text {
+    font-family: var(--font-graffiti), cursive;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
-    line-height: 0.92;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
   }
 
-  .spitzone-wordmark {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(110deg, #f5f0df 0%, #f0b63d 32%, #ff7a1a 58%, #f2447a 100%);
-    filter: drop-shadow(0 10px 30px rgba(242, 68, 122, 0.18));
+  .graffiti-title {
+    font-family: var(--font-graffiti), cursive;
+    font-size: clamp(3rem, 12vw, 8rem);
+    letter-spacing: 0.02em;
+    line-height: 0.9;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ff3a3a 0%, #ffdd00 50%, #ff3a3a 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 30px rgba(255, 58, 58, 0.5));
   }
 
-  .spitzone-kicker {
-    @apply text-[0.68rem] font-semibold uppercase tracking-[0.32em] text-primary/85;
+  /* Neon glow effects */
+  .neon-red {
+    text-shadow: 0 0 10px #ff3a3a, 0 0 20px #ff3a3a, 0 0 40px #ff3a3a;
   }
 
-  .spitzone-panel {
-    @apply rounded-[1.5rem] border border-white/10 bg-card/80 text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-xl;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 24px 90px rgba(0, 0, 0, 0.28);
+  .neon-green {
+    text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88, 0 0 40px #00ff88;
   }
 
-  .spitzone-panel-strong {
-    @apply rounded-[1.5rem] border border-white/10 bg-card/80 text-card-foreground shadow-[0_18px_60px_rgba(0,0,0,0.32)] backdrop-blur-xl;
-    background:
-      linear-gradient(180deg, rgba(27, 23, 35, 0.94) 0%, rgba(14, 13, 20, 0.96) 100%);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.04),
-      0 24px 90px rgba(0, 0, 0, 0.28);
+  .neon-yellow {
+    text-shadow: 0 0 10px #ffdd00, 0 0 20px #ffdd00, 0 0 40px #ffdd00;
   }
 
-  .spitzone-metal-line {
-    position: relative;
-    overflow: hidden;
+  .neon-border {
+    box-shadow: 0 0 10px var(--neon-red), inset 0 0 10px rgba(255, 58, 58, 0.2);
+    border: 1px solid var(--neon-red);
   }
 
-  .spitzone-metal-line::before {
+  .neon-border-green {
+    box-shadow: 0 0 10px var(--neon-green), inset 0 0 10px rgba(0, 255, 136, 0.2);
+    border: 1px solid var(--neon-green);
+  }
+
+  /* Aggressive button styles */
+  .btn-aggressive {
+    @apply relative overflow-hidden font-bold uppercase tracking-wider transition-all duration-200;
+    background: linear-gradient(135deg, #ff3a3a 0%, #cc0000 100%);
+    border: 2px solid #ff3a3a;
+    box-shadow: 0 0 20px rgba(255, 58, 58, 0.4);
+  }
+
+  .btn-aggressive:hover {
+    box-shadow: 0 0 30px rgba(255, 58, 58, 0.6);
+    transform: scale(1.02);
+  }
+
+  .btn-aggressive::before {
     content: "";
     position: absolute;
-    inset: 0 auto 0 0;
-    width: 4px;
-    background: linear-gradient(180deg, #f4bc46 0%, #ff7a1a 50%, #f2447a 100%);
-    border-radius: 999px;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
   }
 
-  .spitzone-nav-link {
-    @apply flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-foreground/72 transition-all duration-200 hover:bg-white/6 hover:text-foreground;
+  .btn-aggressive:hover::before {
+    left: 100%;
   }
 
-  .spitzone-nav-link-active {
-    @apply bg-white/8 text-foreground shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)];
+  /* VS battle card style */
+  .battle-card {
+    @apply relative overflow-hidden rounded-none;
+    background: linear-gradient(135deg, #141414 0%, #1a1a1a 100%);
+    border: 1px solid #333;
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
   }
 
-  .spitzone-chip {
-    @apply inline-flex items-center rounded-full border border-white/12 bg-white/6 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-foreground/72;
+  .battle-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, var(--neon-red), var(--neon-yellow)) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
   }
 
-  .spitzone-chip-live {
-    @apply inline-flex items-center rounded-full border border-white/12 bg-white/6 px-3 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-primary;
-    background: linear-gradient(90deg, rgba(244, 188, 70, 0.14), rgba(242, 68, 122, 0.14));
-    border-color: rgba(244, 188, 70, 0.28);
+  .battle-card:hover::before {
+    opacity: 1;
   }
 
-  .spitzone-surface-grid {
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-    background-size: 36px 36px;
+  /* VS text */
+  .vs-text {
+    font-family: var(--font-graffiti), cursive;
+    font-size: 2rem;
+    color: var(--neon-red);
+    text-shadow: 0 0 20px var(--neon-red);
+    transform: rotate(-5deg);
   }
 
-  .spitzone-wave-divider {
-    height: 2px;
-    background:
-      linear-gradient(90deg, transparent 0%, rgba(244, 188, 70, 0.8) 16%, rgba(242, 68, 122, 0.9) 48%, rgba(92, 111, 255, 0.8) 78%, transparent 100%);
-    border-radius: 999px;
+  /* Live indicator */
+  .live-indicator {
+    @apply inline-flex items-center gap-2 px-3 py-1;
+    background: rgba(255, 58, 58, 0.2);
+    border: 1px solid var(--neon-red);
+  }
+
+  .live-indicator::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background: var(--neon-red);
+    border-radius: 50%;
+    animation: pulse-live 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-live {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+  }
+
+  /* Glitch effect */
+  .glitch {
+    position: relative;
+  }
+
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .glitch::before {
+    animation: glitch-1 2s infinite;
+    color: var(--neon-magenta);
+    z-index: -1;
+  }
+
+  .glitch::after {
+    animation: glitch-2 2s infinite;
+    color: var(--neon-cyan);
+    z-index: -2;
+  }
+
+  @keyframes glitch-1 {
+    0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    20% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, 2px); }
+    40% { clip-path: inset(40% 0 40% 0); transform: translate(2px, -2px); }
+    60% { clip-path: inset(60% 0 20% 0); transform: translate(-2px, -2px); }
+    80% { clip-path: inset(80% 0 0% 0); transform: translate(2px, 2px); }
+  }
+
+  @keyframes glitch-2 {
+    0%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); }
+    20% { clip-path: inset(60% 0 20% 0); transform: translate(2px, -2px); }
+    40% { clip-path: inset(40% 0 40% 0); transform: translate(-2px, 2px); }
+    60% { clip-path: inset(20% 0 60% 0); transform: translate(2px, 2px); }
+    80% { clip-path: inset(0% 0 80% 0); transform: translate(-2px, -2px); }
+  }
+
+  /* Scan line overlay */
+  .scan-lines {
+    position: relative;
+  }
+
+  .scan-lines::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.1) 2px,
+      rgba(0, 0, 0, 0.1) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
   }
 }
 
