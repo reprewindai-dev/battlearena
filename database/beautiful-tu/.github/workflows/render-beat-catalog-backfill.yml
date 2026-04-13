@@ -1,0 +1,44 @@
+name: Render Beat Catalog Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Live deployment base URL
+        required: false
+        default: https://battlearena-poon.onrender.com
+      limit:
+        description: Maximum beats to normalize this run
+        required: false
+        default: "100"
+
+jobs:
+  beat-catalog-backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger beat catalog backfill
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://battlearena-poon.onrender.com' }}
+          CRON_CLEANUP_SECRET: ${{ secrets.CRON_CLEANUP_SECRET }}
+          LIMIT: ${{ inputs.limit || '100' }}
+        run: |
+          if [ -z "$CRON_CLEANUP_SECRET" ]; then
+            echo "CRON_CLEANUP_SECRET is not configured"
+            exit 1
+          fi
+
+          status_code=$(curl --silent --show-error \
+            --output response.json \
+            --write-out "%{http_code}" \
+            -X POST \
+            -H "content-type: application/json" \
+            -H "x-cron-secret: $CRON_CLEANUP_SECRET" \
+            --data "{\"limit\":$LIMIT}" \
+            "$BASE_URL/api/admin/beats/backfill")
+
+          cat response.json
+
+          if [ "$status_code" -lt 200 ] || [ "$status_code" -ge 300 ]; then
+            echo "Beat catalog backfill failed with status $status_code"
+            exit 1
+          fi

@@ -1,0 +1,38 @@
+name: Cleanup stale battle recordings
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate cleanup secrets
+        id: config
+        env:
+          CLEANUP_URL: ${{ secrets.CLEANUP_URL }}
+          CRON_CLEANUP_SECRET: ${{ secrets.CRON_CLEANUP_SECRET }}
+        run: |
+          if [ -z "$CLEANUP_URL" ] || [ -z "$CRON_CLEANUP_SECRET" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Call cleanup endpoint
+        if: steps.config.outputs.enabled == 'true'
+        env:
+          CLEANUP_URL: ${{ secrets.CLEANUP_URL }}
+          CRON_CLEANUP_SECRET: ${{ secrets.CRON_CLEANUP_SECRET }}
+        run: |
+          curl -sS -X POST "$CLEANUP_URL" \
+            -H "x-cron-secret: $CRON_CLEANUP_SECRET" \
+            -H "content-type: application/json" \
+            --data '{}' \
+            --fail
+
+      - name: Skip cleanup when secrets are unavailable
+        if: steps.config.outputs.enabled != 'true'
+        run: echo "Cleanup skipped because CLEANUP_URL or CRON_CLEANUP_SECRET is not configured."

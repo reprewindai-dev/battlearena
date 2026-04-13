@@ -1,0 +1,53 @@
+name: Render Live Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Live deployment base URL
+        required: false
+        default: https://battlearena-poon.onrender.com
+      ref:
+        description: Git ref to test
+        required: false
+        default: main
+
+jobs:
+  live-video:
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=1024
+      PLAYWRIGHT_DISABLE_WEBSERVER: "true"
+      PLAYWRIGHT_BASE_URL: ${{ inputs.base_url }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify deployment health
+        run: |
+          curl --fail --silent --show-error "$PLAYWRIGHT_BASE_URL/api/health"
+
+      - name: Run live video suite
+        run: npm run test:e2e:live-video

@@ -1,0 +1,91 @@
+name: Publish GHCR Image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional tag override
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set image metadata
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/battlearena"
+          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
+            PRIMARY_TAG="${{ github.event.inputs.image_tag }}"
+          else
+            PRIMARY_TAG="sha-${SHORT_SHA}"
+          fi
+          {
+            echo "IMAGE_NAME=${IMAGE_NAME}"
+            echo "PRIMARY_TAG=${PRIMARY_TAG}"
+            echo "SECONDARY_TAG=main"
+          } >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.PRIMARY_TAG }}
+            ${{ env.IMAGE_NAME }}:${{ env.SECONDARY_TAG }}
+          provenance: false
+          sbom: false
+
+      - name: Make package public
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          endpoints=(
+            "https://api.github.com/user/packages/container/battlearena/visibility"
+            "https://api.github.com/users/${GITHUB_REPOSITORY_OWNER}/packages/container/battlearena/visibility"
+          )
+
+          for endpoint in "${endpoints[@]}"; do
+            for attempt in {1..12}; do
+              echo "Attempt ${attempt} for ${endpoint}"
+              if curl --fail-with-body -L \
+                -X PATCH \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "${endpoint}" \
+                -d '{"visibility":"public"}'; then
+                echo "Package visibility updated via ${endpoint}"
+                exit 0
+              fi
+              sleep 10
+            done
+          done
+
+          echo "Failed to make GHCR package public after retries" >&2
+          exit 1

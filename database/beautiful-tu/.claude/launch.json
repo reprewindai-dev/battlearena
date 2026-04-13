@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Spitzone dev server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\antho\\.windsurf\\battlearena\\battlearena", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "LiveKit local server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "C:\\Users\\antho\\.windsurf\\battlearena\\battlearena", "run", "livekit:up"],
+      "port": 7880
+    }
+  ]
+}

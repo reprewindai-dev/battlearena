@@ -1,0 +1,17 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.subscriber = exports.redis = void 0;
+const ioredis_1 = __importDefault(require("ioredis"));
+const config_1 = require("../config");
+exports.redis = new ioredis_1.default(config_1.config.redis.url, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+});
+exports.subscriber = new ioredis_1.default(config_1.config.redis.url, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+});
+//# sourceMappingURL=redis.js.map

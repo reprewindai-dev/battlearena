@@ -1,0 +1,30 @@
+name: Ops Telemetry Alerts
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Live deployment base URL
+        required: false
+        default: https://battlearena-poon.onrender.com
+  schedule:
+    - cron: "*/15 * * * *"
+
+jobs:
+  ops-telemetry-alerts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger telemetry alert evaluation
+        env:
+          BASE_URL: ${{ inputs.base_url || 'https://battlearena-poon.onrender.com' }}
+          OPS_ALERTS_SECRET: ${{ secrets.OPS_ALERTS_SECRET }}
+        run: |
+          if [ -z "$OPS_ALERTS_SECRET" ]; then
+            echo "OPS_ALERTS_SECRET is not configured; skipping"
+            exit 0
+          fi
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "x-cron-secret: $OPS_ALERTS_SECRET" \
+            "$BASE_URL/api/admin/telemetry/alerts"

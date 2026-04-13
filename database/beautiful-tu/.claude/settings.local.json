@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat src/app/app/battles/bot-room/[battleId]/page.tsx)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

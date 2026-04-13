@@ -1,0 +1,34 @@
+_format_version: "1.1"
+
+services:
+  - name: auth
+    url: http://supabase-auth:9999
+    routes:
+      - name: auth
+        paths: ["/auth/v1/"]
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Accept", "Authorization", "Content-Type", "apikey"]
+          exposed_headers: ["Link"]
+          max_age: 86400
+          credentials: true
+
+  - name: rest
+    url: http://supabase-rest:3000
+    routes:
+      - name: rest
+        paths: ["/rest/v1/"]
+        strip_path: true
+    plugins:
+      - name: cors
+        config:
+          origins: ["*"]
+          methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+          headers: ["Accept", "Authorization", "Content-Type", "apikey"]
+          exposed_headers: ["Link"]
+          max_age: 86400
+          credentials: true

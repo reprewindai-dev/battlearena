@@ -1,0 +1,47 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: battlearena-livekit
+    restart: unless-stopped
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50020:50000-50020/udp"
+    environment:
+      - "LIVEKIT_KEYS=${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+      - LIVEKIT_REDIS_ADDRESS=redis:6379
+      - LIVEKIT_TURN_SERVERS=turn:turnserver:3478
+    depends_on:
+      - redis
+      - turnserver
+    networks:
+      - battlearena-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: battlearena-livekit-redis
+    restart: unless-stopped
+    volumes:
+      - livekit_redis_data:/data
+    networks:
+      - battlearena-network
+
+  turnserver:
+    image: coturn/coturn:latest
+    container_name: battlearena-turnserver
+    restart: unless-stopped
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49152-49200:49152-49200/udp"
+    volumes:
+      - ./volumes/turnserver/turnserver.conf:/etc/coturn/turnserver.conf
+    networks:
+      - battlearena-network
+
+volumes:
+  livekit_redis_data:
+
+networks:
+  battlearena-network:
+    driver: bridge

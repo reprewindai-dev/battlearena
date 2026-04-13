@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: battlearena-web
+    runtime: docker
+    repo: https://github.com/reprewindai-dev/battlearena
+    plan: free
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_SITE_URL
+        sync: false
+      - key: NEXT_PUBLIC_WEBSOCKET_URL
+        sync: false
+      - key: NEXT_PUBLIC_LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: BEATS_STORAGE_BUCKET
+        sync: false
+      - key: SERVER_SIGNATURE_SECRET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_BILLING_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_SUB_SPECTATOR_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_SUB_PRO_MONTHLY
+        sync: false
+      - key: STRIPE_PRICE_SUB_PREMIUM_MONTHLY
+        sync: false
+      - key: CRON_CLEANUP_SECRET
+        sync: false
+      - key: GOV_ENABLED
+        value: "true"
+      - key: GOV_TRACE_ONLY
+        value: "false"
+      - key: GOV_ENFORCE_BLOCKS
+        value: "true"
