@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { z } from "zod";
 
+import OAuthButtons from "@/components/auth/OAuthButtons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,8 @@ export default function LoginForm({
 
   return (
     <Card className="border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
+      <OAuthButtons mode="login" nextPath={safeNextPath} />
+      
       <form
         className="space-y-4"
         onSubmit={(e) => {

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { z } from "zod";
 
+import OAuthButtons from "@/components/auth/OAuthButtons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,13 @@ function SignupContent() {
   const [success, setSuccess] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // Calculate safe next path for OAuth
+  const nextParam = searchParams.get("next");
+  const safeNextPath =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/app";
+
   async function handleSignup() {
     setError(null);
     setSuccess(null);
@@ -37,11 +45,6 @@ function SignupContent() {
     }
 
     try {
-      const nextParam = searchParams.get("next");
-      const safeNextPath =
-        nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
-          ? nextParam
-          : "/app";
       const inviteCode = searchParams.get("invite");
 
       const response = await fetch("/api/auth/signup", {
@@ -128,6 +131,8 @@ function SignupContent() {
 
       <div className="lg:col-span-5">
         <Card className="border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
+          <OAuthButtons mode="signup" nextPath={safeNextPath} />
+          
           <form
             className="space-y-4"
             onSubmit={(e) => {
