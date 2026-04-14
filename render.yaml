@@ -19,11 +19,11 @@ services:
       - key: NEXT_PUBLIC_WEBSOCKET_URL
         sync: false
       - key: NEXT_PUBLIC_LIVEKIT_URL
-        sync: false
+        value: wss://battle-arean-ouhbw90q.livekit.cloud/
       - key: LIVEKIT_API_KEY
-        sync: false
+        value: APIWhMbtJnxcavf
       - key: LIVEKIT_API_SECRET
-        sync: false
+        value: t7xnsT7N14oe2lE8GP7atAQt3HpEWhnNZT9kPuPlcEW
       - key: NEXT_PUBLIC_SUPABASE_URL
         value: https://xjnxrkdtdfvusofiwshu.supabase.co
       - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
