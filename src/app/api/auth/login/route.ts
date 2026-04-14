@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createRequestLogContext, logStructured, withRequestId } from "@/lib/logging/structured";
 import { createSupabaseRouteClient } from "@/lib/supabase/route";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
 
@@ -62,6 +63,25 @@ export async function POST(request: NextRequest) {
     if (data.user) {
       logContext.user_id = data.user.id;
       await ensurePublicUserRecord(supabase, data.user).catch(() => null);
+
+      // Fetch admin status and add to user metadata
+      try {
+        const adminClient = createSupabaseServiceRoleClient();
+        const { data: userData } = await adminClient
+          .from("users")
+          .select("is_admin")
+          .eq("id", data.user.id)
+          .single();
+
+        if (userData?.is_admin) {
+          await supabase.auth.updateUser({
+            data: { is_admin: true },
+          });
+        }
+      } catch (error) {
+        // Non-fatal - admin status will be checked on demand
+      }
+
       await getTelemetrySystem()
         .emitEvent({
           event_type: "LOGIN_COMPLETED",

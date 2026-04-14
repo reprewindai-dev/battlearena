@@ -57,6 +57,24 @@ export async function GET(request: Request) {
     logContext.user_id = user.id;
     await ensurePublicUserRecord(supabase, user).catch(() => null);
     await ensureOnboardingProgress(supabase, user.id).catch(() => null);
+
+    // Fetch admin status and add to user metadata
+    try {
+      const adminClient = createSupabaseServiceRoleClient();
+      const { data: userData } = await adminClient
+        .from("users")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+
+      if (userData?.is_admin) {
+        await supabase.auth.updateUser({
+          data: { is_admin: true },
+        });
+      }
+    } catch (error) {
+      // Non-fatal - admin status will be checked on demand
+    }
     const referralCode =
       typeof user.user_metadata?.referral_code === "string"
         ? user.user_metadata.referral_code.trim().toLowerCase()
