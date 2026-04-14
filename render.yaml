@@ -13,9 +13,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_APP_URL
-        sync: false
+        value: https://spitzone.com
       - key: NEXT_PUBLIC_SITE_URL
-        sync: false
+        value: https://spitzone.com
       - key: NEXT_PUBLIC_WEBSOCKET_URL
         sync: false
       - key: NEXT_PUBLIC_LIVEKIT_URL
