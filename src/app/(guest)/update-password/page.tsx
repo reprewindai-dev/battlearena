@@ -22,46 +22,54 @@ function UpdatePasswordContent() {
   // Check if user came from valid reset link
   useEffect(() => {
     async function checkSession() {
-      const supabase = createSupabaseBrowserClient();
-      const code = searchParams.get("code");
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-      const accessToken = hashParams.get("access_token");
-      const refreshToken = hashParams.get("refresh_token");
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const code = searchParams.get("code");
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
 
-      if (accessToken && refreshToken) {
-        await supabase.auth
-          .setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          })
-          .catch(() => null);
+        if (accessToken && refreshToken) {
+          await supabase.auth
+            .setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            })
+            .catch(() => null);
 
-        // Remove sensitive tokens from URL after session hydration.
-        window.history.replaceState({}, "", window.location.pathname + window.location.search);
-      }
+          // Remove sensitive tokens from URL after session hydration.
+          window.history.replaceState({}, "", window.location.pathname + window.location.search);
+        }
 
-      if (code) {
-        await supabase.auth.exchangeCodeForSession(code).catch(() => null);
-      }
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code).catch(() => null);
+        }
 
-      const { data: initialSession } = await supabase.auth.getSession();
-      if (initialSession.session) {
-        setCheckingSession(false);
-        return;
-      }
+        const { data: initialSession } = await supabase.auth.getSession();
+        if (initialSession.session) {
+          return;
+        }
 
-      // Give the browser client a short window to hydrate hash-based recovery tokens.
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      const { data: hydratedSession } = await supabase.auth.getSession();
+        // Give the browser client a short window to hydrate hash-based recovery tokens.
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        const { data: hydratedSession } = await supabase.auth.getSession();
 
-      if (!hydratedSession.session) {
+        if (hydratedSession.session) {
+          return;
+        }
+
         setStatus({
           type: "error",
           message: "Invalid or expired reset link. Please request a new one.",
         });
+      } catch {
+        setStatus({
+          type: "error",
+          message: "Unable to verify reset session. Please request a new reset link.",
+        });
+      } finally {
+        setCheckingSession(false);
       }
-
-      setCheckingSession(false);
     }
     checkSession();
   }, [searchParams]);
