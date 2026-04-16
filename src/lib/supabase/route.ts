@@ -1,14 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { env } from "@/env";
+import { getSupabasePublicKey, getSupabaseUrl } from "@/lib/supabase/config";
 
 export function createSupabaseRouteClient(request: NextRequest) {
-  const publicKey =
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
-    env.SUPABASE_ANON_KEY;
-  const url = env.NEXT_PUBLIC_SUPABASE_URL ?? env.SUPABASE_URL;
+  const publicKey = getSupabasePublicKey();
+  const url = getSupabaseUrl();
 
   if (!url || !publicKey) {
     throw new Error("supabase_public_config_missing");

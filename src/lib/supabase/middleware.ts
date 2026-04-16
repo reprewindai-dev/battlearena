@@ -2,12 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 
-import { env } from "@/env";
+import { getSupabasePublicKey, getSupabaseUrl } from "@/lib/supabase/config";
 
 export async function updateSupabaseSession(request: NextRequest) {
-  const publicKey =
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+  const publicKey = getSupabasePublicKey();
+  const url = getSupabaseUrl();
 
   let response = NextResponse.next({
     request: {
@@ -15,11 +14,11 @@ export async function updateSupabaseSession(request: NextRequest) {
     },
   });
 
-  if (!env.NEXT_PUBLIC_SUPABASE_URL || !publicKey) {
+  if (!url || !publicKey) {
     return response;
   }
 
-  const supabase = createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, publicKey, {
+  const supabase = createServerClient(url, publicKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
