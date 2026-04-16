@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createSupabasePublicClient } from "@/lib/supabase/public";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 function UpdatePasswordContent() {
   const router = useRouter();
@@ -22,19 +22,49 @@ function UpdatePasswordContent() {
   // Check if user came from valid reset link
   useEffect(() => {
     async function checkSession() {
-      const supabase = createSupabasePublicClient();
-      const { data } = await supabase.auth.getSession();
-      
-      if (!data.session) {
+      const supabase = createSupabaseBrowserClient();
+      const code = searchParams.get("code");
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (accessToken && refreshToken) {
+        await supabase.auth
+          .setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          })
+          .catch(() => null);
+
+        // Remove sensitive tokens from URL after session hydration.
+        window.history.replaceState({}, "", window.location.pathname + window.location.search);
+      }
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code).catch(() => null);
+      }
+
+      const { data: initialSession } = await supabase.auth.getSession();
+      if (initialSession.session) {
+        setCheckingSession(false);
+        return;
+      }
+
+      // Give the browser client a short window to hydrate hash-based recovery tokens.
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      const { data: hydratedSession } = await supabase.auth.getSession();
+
+      if (!hydratedSession.session) {
         setStatus({
           type: "error",
           message: "Invalid or expired reset link. Please request a new one.",
         });
       }
+
       setCheckingSession(false);
     }
     checkSession();
-  }, []);
+  }, [searchParams]);
 
   async function handleSubmit() {
     setStatus(null);
@@ -51,7 +81,7 @@ function UpdatePasswordContent() {
 
     startTransition(async () => {
       try {
-        const supabase = createSupabasePublicClient();
+        const supabase = createSupabaseBrowserClient();
         const { error } = await supabase.auth.updateUser({
           password,
         });
