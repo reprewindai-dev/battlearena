@@ -17,6 +17,18 @@ function shouldAutoConfirmSignupsInDev() {
   return process.env.NODE_ENV !== "production" && env.DEV_AUTO_CONFIRM_SIGNUPS !== "false";
 }
 
+async function safeEmitLoginEvent(event: {
+  event_type: string;
+  player_id?: string;
+  event_data?: Record<string, unknown>;
+}) {
+  try {
+    await getTelemetrySystem().emitEvent(event as any);
+  } catch {
+    // Telemetry must never block auth responses.
+  }
+}
+
 async function resolveAuthUserIdByEmail(email: string) {
   const adminClient = createSupabaseServiceRoleClient();
   const normalizedEmail = email.trim().toLowerCase();
@@ -108,15 +120,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      await getTelemetrySystem()
-        .emitEvent({
-          event_type: "LOGIN_FAILED",
-          event_data: {
-            error: error.message,
-            email_domain: emailDomain,
-          },
-        })
-        .catch(() => null);
+      await safeEmitLoginEvent({
+        event_type: "LOGIN_FAILED",
+        event_data: {
+          error: error.message,
+          email_domain: emailDomain,
+        },
+      });
       logStructured("warn", "auth_login_failed", logContext, {
         error: error.message,
       });
@@ -149,15 +159,13 @@ export async function POST(request: NextRequest) {
         // Non-fatal - admin status will be checked on demand
       }
 
-      await getTelemetrySystem()
-        .emitEvent({
-          event_type: "LOGIN_COMPLETED",
-          player_id: data.user.id,
-          event_data: {
-            email_domain: emailDomain,
-          },
-        })
-        .catch(() => null);
+      await safeEmitLoginEvent({
+        event_type: "LOGIN_COMPLETED",
+        player_id: data.user.id,
+        event_data: {
+          email_domain: emailDomain,
+        },
+      });
     }
 
     const response = NextResponse.json(
@@ -180,14 +188,12 @@ export async function POST(request: NextRequest) {
     logStructured("info", "auth_login_completed", logContext);
     return withRequestId(response, logContext.request_id);
   } catch (error) {
-    await getTelemetrySystem()
-      .emitEvent({
-        event_type: "LOGIN_FAILED",
-        event_data: {
-          error: error instanceof Error ? error.message : "unknown_error",
-        },
-      })
-      .catch(() => null);
+    await safeEmitLoginEvent({
+      event_type: "LOGIN_FAILED",
+      event_data: {
+        error: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
     logStructured("error", "auth_login_route_failed", logContext, {
       error: error instanceof Error ? error.message : "unknown_error",
     });

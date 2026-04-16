@@ -28,6 +28,18 @@ function shouldAutoConfirmSignupsInDev() {
   return process.env.NODE_ENV !== "production" && env.DEV_AUTO_CONFIRM_SIGNUPS !== "false";
 }
 
+async function safeEmitSignupEvent(event: {
+  event_type: string;
+  player_id?: string;
+  event_data?: Record<string, unknown>;
+}) {
+  try {
+    await getTelemetrySystem().emitEvent(event as any);
+  } catch {
+    // Telemetry must never block auth responses.
+  }
+}
+
 export async function POST(request: NextRequest) {
   const logContext = createRequestLogContext(request, "/api/auth/signup");
 
@@ -58,16 +70,14 @@ export async function POST(request: NextRequest) {
     const emailRedirectTo = `${origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
     const emailDomain = parsed.data.email.split("@")[1] ?? null;
 
-    await getTelemetrySystem()
-      .emitEvent({
-        event_type: "SIGNUP_STARTED",
-        event_data: {
-          source: "password_signup",
-          email_domain: emailDomain,
-          has_invite_code: Boolean(parsed.data.inviteCode),
-        },
-      })
-      .catch(() => null);
+    await safeEmitSignupEvent({
+      event_type: "SIGNUP_STARTED",
+      event_data: {
+        source: "password_signup",
+        email_domain: emailDomain,
+        has_invite_code: Boolean(parsed.data.inviteCode),
+      },
+    });
 
     const { data, error } = await supabase.auth.signUp({
       email: parsed.data.email,
@@ -81,17 +91,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      await getTelemetrySystem()
-        .emitEvent({
-          event_type: "SIGNUP_FAILED",
-          event_data: {
-            source: "password_signup",
-            error: error.message,
-            email_domain: emailDomain,
-            has_invite_code: Boolean(parsed.data.inviteCode),
-          },
-        })
-        .catch(() => null);
+      await safeEmitSignupEvent({
+        event_type: "SIGNUP_FAILED",
+        event_data: {
+          source: "password_signup",
+          error: error.message,
+          email_domain: emailDomain,
+          has_invite_code: Boolean(parsed.data.inviteCode),
+        },
+      });
       logStructured("warn", "auth_signup_failed", logContext, {
         error: error.message,
       });
@@ -156,16 +164,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (hasActiveSession && data.user) {
-      await getTelemetrySystem()
-        .emitEvent({
-          event_type: "SIGNUP_COMPLETED",
-          player_id: data.user.id,
-          event_data: {
-            source: "password_signup",
-            next_path: nextPath,
-          },
-        })
-        .catch(() => null);
+      await safeEmitSignupEvent({
+        event_type: "SIGNUP_COMPLETED",
+        player_id: data.user.id,
+        event_data: {
+          source: "password_signup",
+          next_path: nextPath,
+        },
+      });
     }
 
     const response = NextResponse.json(
@@ -186,15 +192,13 @@ export async function POST(request: NextRequest) {
     });
     return withRequestId(response, logContext.request_id);
   } catch (error) {
-    await getTelemetrySystem()
-      .emitEvent({
-        event_type: "SIGNUP_FAILED",
-        event_data: {
-          source: "password_signup",
-          error: error instanceof Error ? error.message : "unknown_error",
-        },
-      })
-      .catch(() => null);
+    await safeEmitSignupEvent({
+      event_type: "SIGNUP_FAILED",
+      event_data: {
+        source: "password_signup",
+        error: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
     logStructured("error", "auth_signup_route_failed", logContext, {
       error: error instanceof Error ? error.message : "unknown_error",
     });
