@@ -18,6 +18,12 @@ const schema = z.object({
 });
 
 function mapAuthError(error: string | null) {
+  if (!error) return null;
+
+  if (/email\s+not\s+confirmed/i.test(error)) {
+    return "Your email is not confirmed yet. Check your inbox, or create a fresh account if you're testing locally.";
+  }
+
   switch (error) {
     case "missing_code":
       return "Your sign-in link was incomplete. Request a new confirmation email.";
@@ -28,7 +34,7 @@ function mapAuthError(error: string | null) {
     case "login_unavailable":
       return "Login is temporarily unavailable. Try again in a moment.";
     default:
-      return null;
+      return error;
   }
 }
 

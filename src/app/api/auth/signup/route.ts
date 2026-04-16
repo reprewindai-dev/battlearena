@@ -7,6 +7,7 @@ import { createSupabaseRouteClient } from "@/lib/supabase/route";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/service";
 import { getTelemetrySystem } from "@/lib/telemetry/runtime";
 import { ensurePublicUserRecord } from "@/lib/users/ensure-public-user";
+import { env } from "@/env";
 
 const signupSchema = z.object({
   email: z.string().email(),
@@ -21,6 +22,10 @@ function resolveSafeNextPath(nextPath?: string) {
   }
 
   return nextPath;
+}
+
+function shouldAutoConfirmSignupsInDev() {
+  return process.env.NODE_ENV !== "production" && env.DEV_AUTO_CONFIRM_SIGNUPS !== "false";
 }
 
 export async function POST(request: NextRequest) {
@@ -97,6 +102,42 @@ export async function POST(request: NextRequest) {
       return withRequestId(response, logContext.request_id);
     }
 
+    let hasActiveSession = Boolean(data.session);
+
+    if (!hasActiveSession && data.user && shouldAutoConfirmSignupsInDev()) {
+      try {
+        const adminClient = createSupabaseServiceRoleClient();
+        const { error: confirmError } = await adminClient.auth.admin.updateUserById(data.user.id, {
+          email_confirm: true,
+        });
+
+        if (!confirmError) {
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email: parsed.data.email,
+            password: parsed.data.password,
+          });
+
+          hasActiveSession = Boolean(loginData.session);
+          if (loginError) {
+            logStructured("warn", "auth_signup_dev_autoconfirm_login_failed", logContext, {
+              error: loginError.message,
+            });
+          }
+        } else {
+          logStructured("warn", "auth_signup_dev_autoconfirm_confirm_failed", logContext, {
+            error: confirmError.message,
+          });
+        }
+      } catch (autoConfirmError) {
+        logStructured("warn", "auth_signup_dev_autoconfirm_failed", logContext, {
+          error:
+            autoConfirmError instanceof Error
+              ? autoConfirmError.message
+              : "unknown_error",
+        });
+      }
+    }
+
     if (data.user) {
       logContext.user_id = data.user.id;
       await ensurePublicUserRecord(supabase, data.user).catch(() => null);
@@ -114,7 +155,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (data.session && data.user) {
+    if (hasActiveSession && data.user) {
       await getTelemetrySystem()
         .emitEvent({
           event_type: "SIGNUP_COMPLETED",
@@ -130,7 +171,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(
       {
         ok: true,
-        requiresEmailConfirmation: !data.session,
+        requiresEmailConfirmation: !hasActiveSession,
         nextPath,
       },
       { status: 200, headers: getResponse().headers },
@@ -141,7 +182,7 @@ export async function POST(request: NextRequest) {
     });
 
     logStructured("info", "auth_signup_completed", logContext, {
-      requires_email_confirmation: !data.session,
+      requires_email_confirmation: !hasActiveSession,
     });
     return withRequestId(response, logContext.request_id);
   } catch (error) {
