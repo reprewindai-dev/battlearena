@@ -1,9 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
-
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const host = req.headers.get("host") ?? "";
+  const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+
+  // Canonical redirect: enforce https://spitzone.com (no www, always https)
+  const isWww = host.startsWith("www.");
+  const isHttp = proto === "http";
+  if (isWww || isHttp) {
+    const canonicalUrl = req.nextUrl.clone();
+    canonicalUrl.protocol = "https:";
+    canonicalUrl.host = "spitzone.com";
+    return NextResponse.redirect(canonicalUrl, { status: 301 });
+  }
 
   if (pathname === "/app/battles/pvp") {
     const url = req.nextUrl.clone();
@@ -27,7 +38,7 @@ export async function middleware(req: NextRequest) {
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
-  
+
   const roleClaim = user
     ? ((user.app_metadata as { role?: unknown } | undefined)?.role ??
       (user.user_metadata as { role?: unknown } | undefined)?.role)
@@ -54,5 +65,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*"],
+    matcher: ["/app/:path*", "/", "/((?!_next/static|_next/image|favicon.ico).*)"],
 };
