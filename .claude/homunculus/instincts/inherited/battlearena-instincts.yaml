@@ -1,0 +1,343 @@
+# Instincts generated from https://github.com/reprewindai-dev/battlearena
+# Generated: 2026-07-27T20:10:31.740Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: battlearena-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: chore
+
+## Evidence
+
+- 1 commits analyzed
+- Detected conventional commit pattern
+- Examples: chore(deps): bump the npm_and_yarn group across 17 directories with 8 updates
+
+---
+id: battlearena-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Commit Length
+
+## Action
+
+Write moderate-length commit messages (~77 characters)
+
+## Evidence
+
+- Average commit message length: 77 chars
+- Based on 1 commits
+
+---
+id: battlearena-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Naming Files
+
+## Action
+
+Use kebab-case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: kebab-case
+
+---
+id: battlearena-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: battlearena-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: battlearena-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: battlearena-workflow-multi-package-dependency-upgrade
+trigger: "when doing multi package dependency upgrade"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/reprewindai-dev/battlearena
+---
+
+# Battlearena Workflow Multi Package Dependency Upgrade
+
+## Action
+
+Follow the multi-package-dependency-upgrade workflow:
+1. Identify outdated dependencies in each package.json across all project directories.
+2. Update the version numbers in package.json and package-lock.json for each affected package.
+3. Commit all updated package.json and package-lock.json files in a single commit.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: */package.json, */package-lock.json, */*/package.json
+
+---
+id: battlearena-instinct-file-naming
+trigger: "When creating a new file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct File Naming
+
+## Action
+
+Name the file using kebab-case (e.g., battle-service.ts)
+
+## Evidence
+
+- Pattern in namingConventions.files: kebab-case
+
+---
+id: battlearena-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Function Naming
+
+## Action
+
+Name the function using camelCase (e.g., getUserData)
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: battlearena-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase (e.g., BattleArenaService)
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: battlearena-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE (e.g., MAX_PLAYERS)
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: battlearena-instinct-import-style
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Import Style
+
+## Action
+
+Use relative import paths (e.g., import { foo } from '../bar')
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: battlearena-instinct-export-style
+trigger: "When exporting functions or classes"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Export Style
+
+## Action
+
+Use named exports (e.g., export function foo {})
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: battlearena-instinct-test-location
+trigger: "When writing tests for code in src or backend folders"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Test Location
+
+## Action
+
+Place test files in a separate test directory rather than alongside source files
+
+## Evidence
+
+- Pattern in architecture.testLocation: separate
+
+---
+id: battlearena-instinct-git-commit-format
+trigger: "When making a commit"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Git Commit Format
+
+## Action
+
+Format the commit message using the conventional commit style with a 'chore' prefix for dependency updates (e.g., chore(deps): ...)
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- Prefix 'chore' in commit examples
+
+---
+id: battlearena-instinct-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Git Commit Length
+
+## Action
+
+Keep the commit message concise, around 77 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength: 77
+
+---
+id: battlearena-instinct-multi-package-dependency-upgrade
+trigger: "When dependencies need to be upgraded across multiple packages (e.g., via Dependabot or manually)"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: reprewindai-dev/battlearena
+---
+
+# Battlearena Instinct Multi Package Dependency Upgrade
+
+## Action
+
+Identify outdated dependencies in all package.json files, update them and their corresponding package-lock.json files, and commit all changes in a single commit
+
+## Evidence
+
+- multi-package-dependency-upgrade workflow definition
+- Commit example: chore(deps): bump the npm_and_yarn group across 17 directories with 8 updates
+
